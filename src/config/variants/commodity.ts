@@ -115,6 +115,9 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
 
   ciiChoropleth: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,6 +180,9 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
 
   ciiChoropleth: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 export const VARIANT_CONFIG: VariantConfig = {

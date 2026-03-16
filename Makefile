@@ -7,6 +7,9 @@ GEN_CLIENT_DIR := src/generated/client
 GEN_SERVER_DIR := src/generated/server
 DOCS_API_DIR := docs/api
 
+# Ensure Go bin (buf, protoc-gen-*) is on PATH for generate/lint/deps/format/breaking
+export PATH := $(shell go env GOPATH 2>/dev/null || echo "$$HOME/go")/bin:$(PATH)
+
 # Go install settings
 GO_PROXY := GOPROXY=direct
 GO_PRIVATE := GOPRIVATE=github.com/SebastienMelki
@@ -33,12 +36,24 @@ install-buf: ## Install buf CLI
 		echo "buf installed!"; \
 	fi
 
-install-plugins: ## Install sebuf protoc plugins (requires Go)
+# Install sebuf from a shallow clone with patched go.mod (upstream uses invalid "go 1.24.7"; go.mod expects format 1.23)
+# sebuf's dependencies (libopenapi, ordered-map) require Go 1.23+
+install-plugins: ## Install sebuf protoc plugins (requires Go 1.23+, git)
+	@GOVER=$$(go version 2>/dev/null | sed -E 's/.*go([0-9]+)\.([0-9]+).*/\1.\2/'); \
+	MIN=$$(printf '%s\n' 1.23 "$$GOVER" | sort -V 2>/dev/null | head -n1); \
+	if [ -z "$$GOVER" ] || [ "$$MIN" != "1.23" ]; then \
+		echo "ERROR: sebuf plugins require Go 1.23 or newer. You have: $$(go version 2>/dev/null || echo 'no Go')."; \
+		echo "Install from https://go.dev/dl/ or use: brew install go"; \
+		exit 1; \
+	fi
 	@echo "Installing sebuf protoc plugins $(SEBUF_VERSION)..."
-	@$(GO_INSTALL) github.com/SebastienMelki/sebuf/cmd/protoc-gen-ts-client@$(SEBUF_VERSION)
-	@$(GO_INSTALL) github.com/SebastienMelki/sebuf/cmd/protoc-gen-ts-server@$(SEBUF_VERSION)
-	@$(GO_INSTALL) github.com/SebastienMelki/sebuf/cmd/protoc-gen-openapiv3@$(SEBUF_VERSION)
-	@echo "Plugins installed!"
+	@TMP=$$(mktemp -d) && \
+	(trap "rm -rf $$TMP" EXIT; \
+	 git clone --depth 1 --branch $(SEBUF_VERSION) https://github.com/SebastienMelki/sebuf.git $$TMP && \
+	 sed 's/go 1\.24\.7/go 1.23/' $$TMP/go.mod > $$TMP/go.mod.new && mv $$TMP/go.mod.new $$TMP/go.mod && \
+	 cd $$TMP && $(GO_PROXY) $(GO_PRIVATE) go mod tidy && \
+	 $(GO_PROXY) $(GO_PRIVATE) go install ./cmd/protoc-gen-ts-client ./cmd/protoc-gen-ts-server ./cmd/protoc-gen-openapiv3) && \
+	echo "Plugins installed!"
 
 install-npm: ## Install npm dependencies
 	npm install

@@ -90,7 +90,7 @@ import {
 } from '@/config';
 import type { GulfInvestment } from '@/types';
 import { resolveTradeRouteSegments, TRADE_ROUTES as TRADE_ROUTES_LIST, type TradeRouteSegment } from '@/config/trade-routes';
-import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVariant } from '@/config/map-layer-definitions';
+import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, UAP_LEGEND_ENTRIES, getUapShapeDotColor, getUapShapeLegendLabel, parseRgbToRgba, type MapVariant } from '@/config/map-layer-definitions';
 import { getSecretState } from '@/services/runtime-config';
 import { MapPopup, type PopupType } from './MapPopup';
 import {
@@ -115,7 +115,7 @@ import { pinWebcam, isPinned } from '@/services/webcams/pinned-store';
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
 import { fetchWebcamImage } from '@/services/webcams';
 
-export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
+export type TimeRange = '1d' | '7d' | '30d' | '6m' | '1y' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 type MapInteractionMode = 'flat' | '3d';
 
@@ -173,8 +173,8 @@ const isHappyVariant = SITE_VARIANT === 'happy';
 // Zoom thresholds for layer visibility and labels (matches old Map.ts)
 // Zoom-dependent layer visibility and labels
 const LAYER_ZOOM_THRESHOLDS: Partial<Record<keyof MapLayers, { minZoom: number; showLabels?: number }>> = {
-  bases: { minZoom: 3, showLabels: 5 },
-  nuclear: { minZoom: 3 },
+  bases: { minZoom: 1, showLabels: 5 },
+  nuclear: { minZoom: 1 },
   conflicts: { minZoom: 1, showLabels: 3 },
   economic: { minZoom: 3 },
   natural: { minZoom: 1, showLabels: 2 },
@@ -311,6 +311,9 @@ export class DeckGLMap {
   private repairShips: RepairShip[] = [];
   private healthByCableId: Record<string, CableHealthRecord> = {};
   private protests: SocialUnrestEvent[] = [];
+  private uapSightings: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number }> = [];
+  /** When set, UAP layer shows only sightings matching this legend label (click-to-filter); null = show all. */
+  private selectedUapLegendShape: string | null = null;
   private militaryFlights: MilitaryFlight[] = [];
   private militaryFlightClusters: MilitaryFlightCluster[] = [];
   private militaryVessels: MilitaryVessel[] = [];
@@ -771,12 +774,13 @@ export class DeckGLMap {
   }
 
   private getTimeRangeMs(range: TimeRange = this.state.timeRange): number {
+    const day = 24 * 60 * 60 * 1000;
     const ranges: Record<TimeRange, number> = {
-      '1h': 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000,
-      '48h': 48 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
+      '1d': 1 * day,
+      '7d': 7 * day,
+      '30d': 30 * day,
+      '6m': 180 * day,
+      '1y': 365 * day,
       'all': Infinity,
     };
     return ranges[range];
@@ -1420,14 +1424,19 @@ export class DeckGLMap {
       layers.push(this.createCommodityPortsLayer());
     }
 
-    // APT Groups layer (geopolitical variant only - always shown, no toggle)
-    if (SITE_VARIANT !== 'tech' && SITE_VARIANT !== 'happy') {
+    // APT Groups layer (geopolitical variant only, gated by Cyber Threats toggle)
+    if (mapLayers.cyberThreats && SITE_VARIANT !== 'tech' && SITE_VARIANT !== 'happy') {
       layers.push(this.createAPTGroupsLayer());
     }
 
     // UCDP georeferenced events layer
     if (mapLayers.ucdpEvents && filteredUcdpEvents.length > 0) {
       layers.push(this.createUcdpEventsLayer(filteredUcdpEvents));
+    }
+
+    // UAP sightings layer (NUFORC, etc.) — filtered by time range; dots match legend (emoji or colored circle)
+    if (mapLayers.uapSightings && this.uapSightings.length > 0) {
+      layers.push(...this.createUapSightingsLayers());
     }
 
     // Displacement flows arc layer
@@ -3278,6 +3287,9 @@ export class DeckGLMap {
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name || t('components.deckgl.tooltip.flightCluster'))}</strong><br/>${obj.flightCount || 0} ${t('components.deckgl.tooltip.aircraft')}<br/>${text(obj.activityType)}</div>` };
       case 'protests-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.title)}</strong><br/>${text(obj.country)}</div>` };
+      case 'uap-sightings-emoji-layer':
+      case 'uap-sightings-dot-layer':
+        return { html: `<div class="deckgl-tooltip"><strong>${obj.shape ? text(obj.shape) : t('components.deckgl.layers.uapSightings')}</strong><br/>${text((obj.description ?? '').slice(0, 120))}${(obj.description?.length ?? 0) > 120 ? '…' : ''}</div>` };
       case 'protest-clusters-layer':
         if (obj.count === 1) {
           const item = obj.items?.[0];
@@ -3874,11 +3886,11 @@ export class DeckGLMap {
     slider.className = 'time-slider deckgl-time-slider';
     slider.innerHTML = `
       <div class="time-options">
-        <button class="time-btn ${this.state.timeRange === '1h' ? 'active' : ''}" data-range="1h">1h</button>
-        <button class="time-btn ${this.state.timeRange === '6h' ? 'active' : ''}" data-range="6h">6h</button>
-        <button class="time-btn ${this.state.timeRange === '24h' ? 'active' : ''}" data-range="24h">24h</button>
-        <button class="time-btn ${this.state.timeRange === '48h' ? 'active' : ''}" data-range="48h">48h</button>
+        <button class="time-btn ${this.state.timeRange === '1d' ? 'active' : ''}" data-range="1d">1d</button>
         <button class="time-btn ${this.state.timeRange === '7d' ? 'active' : ''}" data-range="7d">7d</button>
+        <button class="time-btn ${this.state.timeRange === '30d' ? 'active' : ''}" data-range="30d">30d</button>
+        <button class="time-btn ${this.state.timeRange === '6m' ? 'active' : ''}" data-range="6m">6m</button>
+        <button class="time-btn ${this.state.timeRange === '1y' ? 'active' : ''}" data-range="1y">1y</button>
         <button class="time-btn ${this.state.timeRange === 'all' ? 'active' : ''}" data-range="all">${t('components.deckgl.timeAll')}</button>
       </div>
     `;
@@ -3950,6 +3962,7 @@ export class DeckGLMap {
         if (layer) {
           this.state.layers[layer] = (input as HTMLInputElement).checked;
           if (layer === 'flights') this.manageAircraftTimer((input as HTMLInputElement).checked);
+          if (layer === 'bases' && (input as HTMLInputElement).checked) this.debouncedFetchBases();
           this.render();
           this.onLayerChange?.(layer, (input as HTMLInputElement).checked, 'user');
           if (layer === 'ciiChoropleth') {
@@ -4150,6 +4163,19 @@ export class DeckGLMap {
     this.container.appendChild(popup);
   }
 
+  /** UAP legend: only shapes present in current (time-filtered) sightings. */
+  private getUapLegendItemsForCurrentData(shapes: { circle: (color: string) => string }): Array<{ shape: string; label: string }> {
+    const filtered = this.filterByTime(this.uapSightings, (s) => s.timestamp != null ? s.timestamp * 1000 : undefined);
+    const labelsPresent = new Set<string>();
+    for (const s of filtered) {
+      const label = getUapShapeLegendLabel(s.shape);
+      if (label) labelsPresent.add(label);
+    }
+    return UAP_LEGEND_ENTRIES
+      .filter((e) => labelsPresent.has(e.label))
+      .map(({ label, dotColor }) => ({ shape: shapes.circle(dotColor), label }));
+  }
+
   private createLegend(): void {
     const legend = document.createElement('div');
     legend.className = 'map-legend deckgl-legend';
@@ -4163,47 +4189,66 @@ export class DeckGLMap {
     };
 
     const isLight = getCurrentTheme() === 'light';
-    const legendItems = SITE_VARIANT === 'tech'
-      ? [
-        { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: t('components.deckgl.legend.startupHub') },
-        { shape: shapes.circle('rgb(100, 200, 255)'), label: t('components.deckgl.legend.techHQ') },
-        { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 200, 0)'), label: t('components.deckgl.legend.accelerator') },
-        { shape: shapes.circle('rgb(150, 100, 255)'), label: t('components.deckgl.legend.cloudRegion') },
-        { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
-      ]
-      : SITE_VARIANT === 'finance'
+    const legendItems = SITE_VARIANT === 'uap'
+      ? this.getUapLegendItemsForCurrentData(shapes)
+      : SITE_VARIANT === 'tech'
         ? [
-          { shape: shapes.circle('rgb(255, 215, 80)'), label: t('components.deckgl.legend.stockExchange') },
-          { shape: shapes.circle('rgb(0, 220, 150)'), label: t('components.deckgl.legend.financialCenter') },
-          { shape: shapes.hexagon('rgb(255, 210, 80)'), label: t('components.deckgl.legend.centralBank') },
-          { shape: shapes.square('rgb(255, 150, 80)'), label: t('components.deckgl.legend.commodityHub') },
-          { shape: shapes.triangle('rgb(80, 170, 255)'), label: t('components.deckgl.legend.waterway') },
+          { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: t('components.deckgl.legend.startupHub') },
+          { shape: shapes.circle('rgb(100, 200, 255)'), label: t('components.deckgl.legend.techHQ') },
+          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 200, 0)'), label: t('components.deckgl.legend.accelerator') },
+          { shape: shapes.circle('rgb(150, 100, 255)'), label: t('components.deckgl.legend.cloudRegion') },
+          { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
         ]
-        : SITE_VARIANT === 'happy'
+        : SITE_VARIANT === 'finance'
           ? [
-            { shape: shapes.circle('rgb(34, 197, 94)'), label: 'Positive Event' },
-            { shape: shapes.circle('rgb(234, 179, 8)'), label: 'Breakthrough' },
-            { shape: shapes.circle('rgb(74, 222, 128)'), label: 'Act of Kindness' },
-            { shape: shapes.circle('rgb(255, 100, 50)'), label: 'Natural Event' },
-            { shape: shapes.square('rgb(34, 180, 100)'), label: 'Happy Country' },
-            { shape: shapes.circle('rgb(74, 222, 128)'), label: 'Species Recovery Zone' },
-            { shape: shapes.circle('rgb(255, 200, 50)'), label: 'Renewable Installation' },
-            { shape: shapes.circle('rgb(160, 100, 255)'), label: t('components.deckgl.legend.aircraft') },
+            { shape: shapes.circle('rgb(255, 215, 80)'), label: t('components.deckgl.legend.stockExchange') },
+            { shape: shapes.circle('rgb(0, 220, 150)'), label: t('components.deckgl.legend.financialCenter') },
+            { shape: shapes.hexagon('rgb(255, 210, 80)'), label: t('components.deckgl.legend.centralBank') },
+            { shape: shapes.square('rgb(255, 150, 80)'), label: t('components.deckgl.legend.commodityHub') },
+            { shape: shapes.triangle('rgb(80, 170, 255)'), label: t('components.deckgl.legend.waterway') },
           ]
-          : [
-            { shape: shapes.circle('rgb(255, 68, 68)'), label: t('components.deckgl.legend.highAlert') },
-            { shape: shapes.circle('rgb(255, 165, 0)'), label: t('components.deckgl.legend.elevated') },
-            { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 255, 0)'), label: t('components.deckgl.legend.monitoring') },
-            { shape: shapes.triangle('rgb(68, 136, 255)'), label: t('components.deckgl.legend.base') },
-            { shape: shapes.hexagon(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 220, 0)'), label: t('components.deckgl.legend.nuclear') },
-            { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
-            { shape: shapes.circle('rgb(160, 100, 255)'), label: t('components.deckgl.legend.aircraft') },
-          ];
+          : SITE_VARIANT === 'happy'
+            ? [
+              { shape: shapes.circle('rgb(34, 197, 94)'), label: 'Positive Event' },
+              { shape: shapes.circle('rgb(234, 179, 8)'), label: 'Breakthrough' },
+              { shape: shapes.circle('rgb(74, 222, 128)'), label: 'Act of Kindness' },
+              { shape: shapes.circle('rgb(255, 100, 50)'), label: 'Natural Event' },
+              { shape: shapes.square('rgb(34, 180, 100)'), label: 'Happy Country' },
+              { shape: shapes.circle('rgb(74, 222, 128)'), label: 'Species Recovery Zone' },
+              { shape: shapes.circle('rgb(255, 200, 50)'), label: 'Renewable Installation' },
+              { shape: shapes.circle('rgb(160, 100, 255)'), label: t('components.deckgl.legend.aircraft') },
+            ]
+            : [
+              { shape: shapes.circle('rgb(255, 68, 68)'), label: t('components.deckgl.legend.highAlert') },
+              { shape: shapes.circle('rgb(255, 165, 0)'), label: t('components.deckgl.legend.elevated') },
+              { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 255, 0)'), label: t('components.deckgl.legend.monitoring') },
+              { shape: shapes.triangle('rgb(68, 136, 255)'), label: t('components.deckgl.legend.base') },
+              { shape: shapes.hexagon(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 220, 0)'), label: t('components.deckgl.legend.nuclear') },
+              { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
+              { shape: shapes.circle('rgb(160, 100, 255)'), label: t('components.deckgl.legend.aircraft') },
+            ];
 
     legend.innerHTML = `
       <span class="legend-label-title">${t('components.deckgl.legend.title')}</span>
-      ${legendItems.map(({ shape, label }) => `<span class="legend-item">${shape}<span class="legend-label">${label}</span></span>`).join('')}
+      ${legendItems.map(({ shape, label }) => {
+        const isUap = SITE_VARIANT === 'uap';
+        const active = isUap && this.selectedUapLegendShape === label;
+        const itemClass = `legend-item${isUap ? ' legend-item--clickable' : ''}${active ? ' legend-item--active' : ''}`;
+        const dataShape = isUap ? ` data-uap-shape="${escapeHtml(label)}"` : '';
+        return `<span class="${itemClass}"${dataShape} role="${isUap ? 'button' : 'presentation'}">${shape}<span class="legend-label">${label}</span></span>`;
+      }).join('')}
     `;
+
+    if (SITE_VARIANT === 'uap') {
+      legend.addEventListener('click', (e: MouseEvent) => {
+        const item = (e.target as HTMLElement).closest('.legend-item[data-uap-shape]');
+        if (!item) return;
+        const shape = item.getAttribute('data-uap-shape');
+        if (shape == null) return;
+        this.selectedUapLegendShape = this.selectedUapLegendShape === shape ? null : shape;
+        this.render();
+      });
+    }
 
     // CII choropleth gradient legend (shown when layer is active)
     const ciiLegend = document.createElement('div');
@@ -4273,6 +4318,26 @@ export class DeckGLMap {
       console.warn(`[DeckGLMap] updateLayers took ${elapsed.toFixed(2)}ms (>16ms budget)`);
     }
     this.updateZoomHints();
+    if (SITE_VARIANT === 'uap') this.updateUapLegendContent();
+  }
+
+  private updateUapLegendContent(): void {
+    const legend = this.container.querySelector('.deckgl-legend');
+    if (!legend) return;
+    const shapes = {
+      circle: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="${color}"/></svg>`,
+    };
+    const legendItems = this.getUapLegendItemsForCurrentData(shapes);
+    const title = legend.querySelector('.legend-label-title');
+    const titleText = title?.textContent ?? t('components.deckgl.legend.title');
+    legend.innerHTML = `
+      <span class="legend-label-title">${titleText}</span>
+      ${legendItems.map(({ shape, label }) => {
+        const active = this.selectedUapLegendShape === label;
+        const itemClass = `legend-item legend-item--clickable${active ? ' legend-item--active' : ''}`;
+        return `<span class="${itemClass}" data-uap-shape="${escapeHtml(label)}" role="button">${shape}<span class="legend-label">${label}</span></span>`;
+      }).join('')}
+    `;
   }
 
   private updateZoomHints(): void {
@@ -4362,6 +4427,7 @@ export class DeckGLMap {
   public setLayers(layers: MapLayers): void {
     this.state.layers = { ...layers };
     this.manageAircraftTimer(this.state.layers.flights);
+    if (this.state.layers.bases) this.debouncedFetchBases();
     this.render(); // Debounced
 
     Object.entries(this.state.layers).forEach(([key, value]) => {
@@ -4639,6 +4705,32 @@ export class DeckGLMap {
     this.syncPulseAnimation();
   }
 
+  public setUapSightings(sightings: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number }>): void {
+    this.uapSightings = sightings ?? [];
+    this.render();
+  }
+
+  private createUapSightingsLayers(): Layer[] {
+    // Filter by occurred date (s.timestamp = Unix seconds from server), not reported date
+    let data = this.filterByTime(this.uapSightings, (s) => s.timestamp != null ? s.timestamp * 1000 : undefined);
+    if (this.selectedUapLegendShape) {
+      data = data.filter((s) => getUapShapeLegendLabel(s.shape) === this.selectedUapLegendShape);
+    }
+    if (data.length === 0) return [];
+    return [
+      new ScatterplotLayer({
+        id: 'uap-sightings-dot-layer',
+        data,
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: 12000,
+        getFillColor: (d) => parseRgbToRgba(getUapShapeDotColor(d.shape)),
+        radiusMinPixels: 5,
+        radiusMaxPixels: 14,
+        pickable: true,
+      }),
+    ];
+  }
+
   public setFlightDelays(delays: AirportDelayAlert[]): void {
     this.flightDelays = delays;
     this.render();
@@ -4666,7 +4758,7 @@ export class DeckGLMap {
     const mapLayers = this.state.layers;
     if (!mapLayers.bases) return;
     const zoom = this.maplibreMap.getZoom();
-    if (zoom < 3) return;
+    if (zoom < 2) return;
     const bounds = this.maplibreMap.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();

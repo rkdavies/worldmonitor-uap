@@ -77,9 +77,18 @@ function channelInitials(name: string): string {
   return name.split(/[\s-]+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
 }
 
-export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise<void> {
+export interface LiveChannelsWindowOptions {
+  storageSuffix?: string;
+}
+
+export async function initLiveChannelsWindow(
+  containerEl?: HTMLElement,
+  options?: LiveChannelsWindowOptions,
+): Promise<void> {
   const appEl = containerEl ?? document.getElementById('app');
   if (!appEl) return;
+
+  const storageSuffix = options?.storageSuffix ?? '';
 
   const userCountry = await resolveUserCountryCode();
   const filteredChannels = getFilteredOptionalChannels(userCountry);
@@ -91,7 +100,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
 
   if (document.getElementById('liveChannelsList')) {
     // Already initialized, just update the list
-    channels = loadChannelsFromStorage();
+    channels = loadChannelsFromStorage(storageSuffix);
     const listEl = document.getElementById('liveChannelsList') as HTMLElement;
     renderList(listEl);
     return;
@@ -101,7 +110,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     document.title = `${t('components.liveNews.manage') ?? 'Channel management'} - World Monitor`;
   }
 
-  channels = loadChannelsFromStorage();
+  channels = loadChannelsFromStorage(storageSuffix);
   let suppressRowClick = false;
   let searchQuery = '';
 
@@ -111,7 +120,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     const ids = Array.from(rows).map((el) => el.dataset.channelId).filter((id): id is string => !!id);
     const map = new Map(channels.map((c) => [c.id, c]));
     channels = ids.map((id) => map.get(id)).filter((c): c is LiveChannel => !!c);
-    saveChannelsToStorage(channels);
+    saveChannelsToStorage(channels, storageSuffix);
   }
 
   function setupListDnD(listEl: HTMLElement): void {
@@ -186,7 +195,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
       removeX.addEventListener('click', (e) => {
         e.stopPropagation();
         channels = channels.filter((c) => c.id !== ch.id);
-        saveChannelsToStorage(channels);
+        saveChannelsToStorage(channels, storageSuffix);
         renderList(listEl);
       });
       row.appendChild(removeX);
@@ -275,7 +284,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     removeBtn.textContent = t('components.liveNews.remove') ?? 'Remove';
     removeBtn.addEventListener('click', () => {
       channels = channels.filter((c) => c.id !== ch.id);
-      saveChannelsToStorage(channels);
+      saveChannelsToStorage(channels, storageSuffix);
       renderList(listEl);
     });
     row.appendChild(removeBtn);
@@ -289,7 +298,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
       const next = applyEditFormToChannels(ch, row, isCustom, displayName);
       if (next) {
         channels = next;
-        saveChannelsToStorage(channels);
+        saveChannelsToStorage(channels, storageSuffix);
       }
       renderList(listEl);
     });
@@ -434,7 +443,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
         if (channels.some((c) => c.id === ch.id)) return;
         channels.push({ ...ch });
       }
-      saveChannelsToStorage(channels);
+      saveChannelsToStorage(channels, storageSuffix);
       renderList(listEl);
       renderAvailableChannels(listEl);
     });
@@ -506,7 +515,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
     const missing = getMissingDefaultChannels();
     if (missing.length === 0) return;
     channels = [...channels, ...missing];
-    saveChannelsToStorage(channels);
+    saveChannelsToStorage(channels, storageSuffix);
     renderList(listEl);
   });
 
@@ -537,7 +546,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
 
       const name = nameInput?.value?.trim() || 'HLS Stream';
       channels.push({ id, name, hlsUrl, useFallbackOnly: true });
-      saveChannelsToStorage(channels);
+      saveChannelsToStorage(channels, storageSuffix);
       renderList(listEl);
       if (handleInput) handleInput.value = '';
       if (hlsInput) hlsInput.value = '';
@@ -581,7 +590,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
       }
 
       channels.push({ id, name: resolvedName, handle: `@video`, fallbackVideoId: videoId, useFallbackOnly: true });
-      saveChannelsToStorage(channels);
+      saveChannelsToStorage(channels, storageSuffix);
       renderList(listEl);
       if (handleInput) handleInput.value = '';
       if (hlsInput) hlsInput.value = '';
@@ -632,7 +641,7 @@ export async function initLiveChannelsWindow(containerEl?: HTMLElement): Promise
 
     const name = nameInput?.value?.trim() || resolvedName || handle;
     channels.push({ id, name, handle });
-    saveChannelsToStorage(channels);
+    saveChannelsToStorage(channels, storageSuffix);
     renderList(listEl);
     if (handleInput) handleInput.value = '';
     if (hlsInput) hlsInput.value = '';

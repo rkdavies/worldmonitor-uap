@@ -56,7 +56,6 @@ import {
   fetchTariffTrends,
   fetchTradeFlows,
   fetchTradeBarriers,
-  fetchCustomsRevenue,
   fetchShippingRates,
   fetchChokepointStatus,
   fetchCriticalMinerals,
@@ -103,6 +102,8 @@ import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { getHydratedData } from '@/services/bootstrap';
+import { canQueueAiClassification, AI_CLASSIFY_MAX_PER_FEED } from '@/services/ai-classify-queue';
+import { classifyWithAI } from '@/services/threat-classifier';
 import { ingestHeadlines } from '@/services/trending-keywords';
 import type { ListFeedDigestResponse } from '@/generated/client/worldmonitor/news/v1/service_client';
 import type { GetSectorSummaryResponse, ListMarketQuotesResponse } from '@/generated/client/worldmonitor/market/v1/service_client';
@@ -310,6 +311,8 @@ export class DataLoaderManager implements AppModule {
     // Desktop: server digest has fewer categories than client FEEDS config.
     // Enable per-feed RSS fallback so missing categories fetch directly.
     if (isDesktopRuntime()) return true;
+    // UAP variant: server digest only knows full/tech/finance/etc.; UAP categories are never in digest.
+    if (SITE_VARIANT === 'uap') return true;
     return isFeatureEnabled('newsPerFeedFallback');
   }
 
@@ -429,7 +432,7 @@ export class DataLoaderManager implements AppModule {
       });
     }
 
-    if (Object.prototype.hasOwnProperty.call(DEFAULT_PANELS, 'giving') && shouldLoad('giving')) {
+    if (Object.prototype.hasOwnProperty.call(DEFAULT_PANELS, 'giving')) {
       tasks.push({
         name: 'giving',
         task: runGuarded('giving', async () => {
@@ -454,14 +457,10 @@ export class DataLoaderManager implements AppModule {
           this.ctx.map?.setLayerReady('ciiChoropleth', true);
         }
       } catch { /* non-fatal */ }
-      if (shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture'])) {
-        tasks.push({ name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) });
-      }
+      tasks.push({ name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) });
     }
 
-    if (SITE_VARIANT === 'full' && (shouldLoad('satellite-fires') || this.ctx.mapLayers.natural)) {
-      tasks.push({ name: 'firms', task: runGuarded('firms', () => this.loadFirmsData()) });
-    }
+    if (SITE_VARIANT === 'full') tasks.push({ name: 'firms', task: runGuarded('firms', () => this.loadFirmsData()) });
     if (this.ctx.mapLayers.natural) tasks.push({ name: 'natural', task: runGuarded('natural', () => this.loadNatural()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
     if (SITE_VARIANT !== 'happy' && !isDesktopRuntime() && this.ctx.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
@@ -469,10 +468,11 @@ export class DataLoaderManager implements AppModule {
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.cables) tasks.push({ name: 'cableHealth', task: runGuarded('cableHealth', () => this.loadCableHealth()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.flights) tasks.push({ name: 'flights', task: runGuarded('flights', () => this.loadFlightDelays()) });
     if (SITE_VARIANT !== 'happy' && CYBER_LAYER_ENABLED && this.ctx.mapLayers.cyberThreats) tasks.push({ name: 'cyberThreats', task: runGuarded('cyberThreats', () => this.loadCyberThreats()) });
-    if (SITE_VARIANT !== 'happy' && !isDesktopRuntime() && (this.ctx.mapLayers.iranAttacks || shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture']))) tasks.push({ name: 'iranAttacks', task: runGuarded('iranAttacks', () => this.loadIranEvents()) });
+    if (SITE_VARIANT !== 'happy' && !isDesktopRuntime()) tasks.push({ name: 'iranAttacks', task: runGuarded('iranAttacks', () => this.loadIranEvents()) });
     if (SITE_VARIANT !== 'happy' && (this.ctx.mapLayers.techEvents || SITE_VARIANT === 'tech')) tasks.push({ name: 'techEvents', task: runGuarded('techEvents', () => this.loadTechEvents()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.satellites && this.ctx.map?.isGlobeMode?.()) tasks.push({ name: 'satellites', task: runGuarded('satellites', () => this.loadSatellites()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.webcams) tasks.push({ name: 'webcams', task: runGuarded('webcams', () => this.loadWebcams()) });
+    if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.uapSightings) tasks.push({ name: 'uapSightings', task: runGuarded('uapSightings', () => this.loadUapSightings()) });
 
     if (SITE_VARIANT !== 'happy') {
       tasks.push({ name: 'techReadiness', task: runGuarded('techReadiness', () => (this.ctx.panels['tech-readiness'] as TechReadinessPanel)?.refresh()) });
@@ -580,6 +580,9 @@ export class DataLoaderManager implements AppModule {
         case 'climate':
         case 'gpsJamming':
           await this.loadIntelligenceSignals();
+          break;
+        case 'uapSightings':
+          await this.loadUapSightings();
           break;
       }
     } finally {
@@ -694,12 +697,13 @@ export class DataLoaderManager implements AppModule {
   }
 
   getTimeRangeWindowMs(range: TimeRange): number {
+    const day = 24 * 60 * 60 * 1000;
     const ranges: Record<TimeRange, number> = {
-      '1h': 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000,
-      '48h': 48 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
+      '1d': 1 * day,
+      '7d': 7 * day,
+      '30d': 30 * day,
+      '6m': 180 * day,
+      '1y': 365 * day,
       'all': Infinity,
     };
     return ranges[range];
@@ -716,11 +720,11 @@ export class DataLoaderManager implements AppModule {
 
   getTimeRangeLabel(range: TimeRange = this.ctx.currentTimeRange): string {
     const labels: Record<TimeRange, string> = {
-      '1h': 'the last hour',
-      '6h': 'the last 6 hours',
-      '24h': 'the last 24 hours',
-      '48h': 'the last 48 hours',
+      '1d': 'the last day',
       '7d': 'the last 7 days',
+      '30d': 'the last 30 days',
+      '6m': 'the last 6 months',
+      '1y': 'the last year',
       'all': 'all time',
     };
     return labels[range];
@@ -766,16 +770,25 @@ export class DataLoaderManager implements AppModule {
 
       // Digest branch: server already aggregated feeds — map proto items to client types
       if (digest?.categories && category in digest.categories) {
-        const items = (digest.categories[category]?.items ?? [])
+        let items = (digest.categories[category]?.items ?? [])
           .map(protoItemToNewsItem)
           .filter(i => enabledNames.has(i.source));
 
         ingestHeadlines(items.map(i => ({ title: i.title, pubDate: i.pubDate, source: i.source, link: i.link })));
 
-        // Skip client-side AI reclassification for digest items.
-        // The server already ran enrichWithAiCache() which checks the same Redis keys
-        // that classifyEvent writes to. Re-firing classifyEvent from every client wastes
-        // edge requests even when they're Redis cache hits.
+        const aiCandidates = items
+          .filter(i => i.threat?.source === 'keyword')
+          .sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime())
+          .slice(0, AI_CLASSIFY_MAX_PER_FEED);
+        for (const item of aiCandidates) {
+          if (!canQueueAiClassification(item.title)) continue;
+          classifyWithAI(item.title, SITE_VARIANT).then(ai => {
+            if (ai && item.threat && ai.confidence > item.threat.confidence) {
+              item.threat = ai;
+              item.isAlert = ai.level === 'critical' || ai.level === 'high';
+            }
+          }).catch(() => {});
+        }
 
         checkBatchForBreakingAlerts(items);
         this.flashMapForNews(items);
@@ -1359,11 +1372,6 @@ export class DataLoaderManager implements AppModule {
 
   async loadForecasts(): Promise<void> {
     try {
-      const hydrated = getHydratedData('forecasts') as { predictions?: import('@/generated/client/worldmonitor/forecast/v1/service_client').Forecast[] } | undefined;
-      if (hydrated?.predictions?.length) {
-        this.callPanel('forecast', 'updateForecasts', hydrated.predictions);
-        return;
-      }
       const { fetchForecasts } = await import('@/services/forecast');
       const forecasts = await fetchForecasts();
       this.callPanel('forecast', 'updateForecasts', forecasts);
@@ -1871,6 +1879,77 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
+  /** Normalize UAP sighting coordinates: accept lat/lon or latitude/longitude, coerce to numbers, fix swap. */
+  private static normalizeUapSightingCoords(
+    s: { lat?: number; lon?: number; latitude?: number; longitude?: number; id?: string; description?: string; shape?: string; timestamp?: number },
+  ): { lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number } | null {
+    let lat = Number(s.lat ?? s.latitude ?? NaN);
+    let lon = Number(s.lon ?? s.longitude ?? NaN);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
+    // Fix swapped lat/lon: latitude in [-90,90], longitude in [-180,180]
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      const swLat = lon;
+      const swLon = lat;
+      if (swLat >= -90 && swLat <= 90 && swLon >= -180 && swLon <= 180) {
+        lat = swLat;
+        lon = swLon;
+      }
+    }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return { ...s, lat, lon };
+  }
+
+  async loadUapSightings(): Promise<void> {
+    const UAP_SEED: Array<{ lat: number; lon: number; id: string; description: string; shape: string }> = [
+      { id: 'seed-1', lat: 34.05, lon: -118.24, description: 'Sample sighting (Los Angeles area).', shape: 'Unknown' },
+      { id: 'seed-2', lat: 40.71, lon: -74.01, description: 'Sample sighting (New York area).', shape: 'Unknown' },
+      { id: 'seed-3', lat: 41.88, lon: -87.63, description: 'Sample sighting (Chicago area).', shape: 'Unknown' },
+      { id: 'seed-4', lat: 29.76, lon: -95.37, description: 'Sample sighting (Houston area).', shape: 'Unknown' },
+      { id: 'seed-5', lat: 33.45, lon: -112.07, description: 'Sample sighting (Phoenix area).', shape: 'Unknown' },
+    ];
+    try {
+      const url = toApiUrl('/api/uap/v1/list-uap-sightings?page_size=200');
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000), cache: 'no-store' });
+      if (!res.ok) throw new Error(`UAP sightings ${res.status}`);
+      const data = (await res.json()) as { sightings?: unknown };
+      const raw = Array.isArray(data.sightings)
+        ? data.sightings
+        : data.sightings && typeof data.sightings === 'object'
+          ? Object.values(data.sightings)
+          : [];
+      const sightings = raw
+        .map((s) => DataLoaderManager.normalizeUapSightingCoords(s as Parameters<typeof DataLoaderManager.normalizeUapSightingCoords>[0]))
+        .filter((s): s is NonNullable<typeof s> => s != null);
+      const toSet = sightings.length > 0 ? sightings : UAP_SEED;
+      // #region agent log
+      fetch('http://127.0.0.1:7754/ingest/306c5720-478b-46c1-a212-7caa496d04e1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '34b813' },
+        body: JSON.stringify({
+          sessionId: '34b813',
+          location: 'data-loader.ts:loadUapSightings',
+          message: 'UAP sightings sent to map',
+          data: { count: toSet.length, sample: toSet.slice(0, 3).map((s) => ({ id: s.id, lat: s.lat, lon: s.lon })) },
+          timestamp: Date.now(),
+          hypothesisId: 'H4',
+        }),
+      }).catch(() => {});
+      // #endregion
+      this.ctx.map?.setUapSightings(toSet);
+      this.ctx.map?.setLayerReady('uapSightings', true);
+      const isSeedOnly = sightings.length === 0 && toSet.length === UAP_SEED.length;
+      if (isSeedOnly) {
+        dataFreshness.recordError('uap_sightings', 'NUFORC data not loading—showing sample points');
+      } else if (sightings.length > 0) {
+        dataFreshness.recordUpdate('uap_sightings', sightings.length);
+      }
+    } catch (e) {
+      this.ctx.map?.setUapSightings(UAP_SEED);
+      this.ctx.map?.setLayerReady('uapSightings', true);
+      dataFreshness.recordError('uap_sightings', String(e));
+    }
+  }
+
   async loadAisSignals(): Promise<void> {
     try {
       const { disruptions, density } = await fetchAisSignals();
@@ -2295,38 +2374,27 @@ export class DataLoaderManager implements AppModule {
     if (!tradePanel) return;
 
     try {
-      const [restrictions, tariffs, flows, barriers, revenue] = await Promise.allSettled([
+      const [restrictions, tariffs, flows, barriers] = await Promise.all([
         fetchTradeRestrictions([], 50),
         fetchTariffTrends('840', '156', '', 10),
         fetchTradeFlows('840', '156', 10),
         fetchTradeBarriers([], '', 50),
-        fetchCustomsRevenue(),
       ]);
 
-      const r = restrictions.status === 'fulfilled' ? restrictions.value : null;
-      const ta = tariffs.status === 'fulfilled' ? tariffs.value : null;
-      const fl = flows.status === 'fulfilled' ? flows.value : null;
-      const ba = barriers.status === 'fulfilled' ? barriers.value : null;
-      const rev = revenue.status === 'fulfilled' ? revenue.value : null;
+      tradePanel.updateRestrictions(restrictions);
+      tradePanel.updateTariffs(tariffs);
+      tradePanel.updateFlows(flows);
+      tradePanel.updateBarriers(barriers);
 
-      if (r) tradePanel.updateRestrictions(r);
-      if (ta) tradePanel.updateTariffs(ta);
-      if (fl) tradePanel.updateFlows(fl);
-      if (ba) tradePanel.updateBarriers(ba);
-      if (rev) tradePanel.updateRevenue(rev);
+      const totalItems = restrictions.restrictions.length + tariffs.datapoints.length + flows.flows.length + barriers.barriers.length;
+      const anyUnavailable = restrictions.upstreamUnavailable || tariffs.upstreamUnavailable || flows.upstreamUnavailable || barriers.upstreamUnavailable;
 
-      const wtoItems = (r?.restrictions?.length ?? 0) + (ta?.datapoints?.length ?? 0) + (fl?.flows?.length ?? 0) + (ba?.barriers?.length ?? 0);
-      const anyUnavailable = r?.upstreamUnavailable || ta?.upstreamUnavailable || fl?.upstreamUnavailable || ba?.upstreamUnavailable;
+      this.ctx.statusPanel?.updateApi('WTO', { status: anyUnavailable ? 'warning' : totalItems > 0 ? 'ok' : 'error' });
 
-      this.ctx.statusPanel?.updateApi('WTO', { status: anyUnavailable ? 'warning' : wtoItems > 0 ? 'ok' : 'error' });
-
-      if (wtoItems > 0) {
-        dataFreshness.recordUpdate('wto_trade', wtoItems);
+      if (totalItems > 0) {
+        dataFreshness.recordUpdate('wto_trade', totalItems);
       } else if (anyUnavailable) {
         dataFreshness.recordError('wto_trade', 'WTO upstream temporarily unavailable');
-      }
-      if (rev?.months?.length) {
-        dataFreshness.recordUpdate('treasury_revenue', rev.months.length);
       }
     } catch (e) {
       console.error('[App] Trade policy failed:', e);

@@ -137,6 +137,9 @@ const layers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 await initI18n();

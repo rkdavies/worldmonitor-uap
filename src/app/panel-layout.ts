@@ -6,6 +6,9 @@ import {
   MapContainer,
   NewsPanel,
   MarketPanel,
+  UapAaiPanel,
+  UapSensorsPanel,
+  UapLegislativePanel,
   StockAnalysisPanel,
   StockBacktestPanel,
   HeatmapPanel,
@@ -174,6 +177,15 @@ export class PanelLayoutManager implements AppModule {
                title="Good News${SITE_VARIANT === 'happy' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">☀️</span>
               <span class="variant-label">Good News</span>
+            </a>
+            <span class="variant-divider"></span>
+            <a href="${vHref('uap', 'https://uap.worldmonitor.app')}"
+               class="variant-option ${SITE_VARIANT === 'uap' ? 'active' : ''}"
+               data-variant="uap"
+               ${vTarget('uap')}
+               title="UAP${SITE_VARIANT === 'uap' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">🛸</span>
+              <span class="variant-label">UAP</span>
             </a>`;
       })()}</div>
           <span class="logo">MONITOR</span><span class="logo-mobile">World Monitor</span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
@@ -238,6 +250,7 @@ export class PanelLayoutManager implements AppModule {
           { key: 'finance', icon: '📈', label: t('header.finance') },
           { key: 'commodity', icon: '⛏️', label: t('header.commodity') },
           { key: 'happy', icon: '☀️', label: 'Good News' },
+          { key: 'uap', icon: '🛸', label: 'UAP' },
         ];
         return variants.map(v =>
           `<button class="mobile-menu-item mobile-menu-variant ${v.key === SITE_VARIANT ? 'active' : ''}" data-variant="${v.key}">
@@ -299,7 +312,7 @@ export class PanelLayoutManager implements AppModule {
         <div class="map-section" id="mapSection">
           <div class="panel-header">
             <div class="panel-header-left">
-              <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'happy' ? 'Good News Map' : t('panels.map')}</span>
+              <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'happy' ? 'Good News Map' : SITE_VARIANT === 'uap' ? 'UAP Situation Map' : t('panels.map')}</span>
             </div>
             <span class="header-clock" id="headerClock" translate="no"></span>
             <div class="map-header-actions">
@@ -741,6 +754,9 @@ export class PanelLayoutManager implements AppModule {
     if (this.shouldCreatePanel('live-news')) {
       this.ctx.panels['live-news'] = new LiveNewsPanel();
     }
+    if (this.shouldCreatePanel('live-news-2')) {
+      this.ctx.panels['live-news-2'] = new LiveNewsPanel({ panelKey: 'live-news-2' });
+    }
 
     if (this.shouldCreatePanel('live-webcams')) {
       this.ctx.panels['live-webcams'] = new LiveWebcamsPanel();
@@ -847,6 +863,17 @@ export class PanelLayoutManager implements AppModule {
           return p;
         }),
       );
+    }
+
+    this.createNewsPanel('uap-news', 'panels.uapNews');
+    this.createPanel('uap-aai', () => new UapAaiPanel());
+    if (SITE_VARIANT === 'uap') {
+      this.createNewsPanel('uap-institutional', 'panels.uapInstitutional');
+      this.createNewsPanel('uap-investigative', 'panels.uapInvestigative');
+      this.createNewsPanel('uap-scientific', 'panels.uapScientific');
+      this.createNewsPanel('uap-sightings', 'panels.uapSightings');
+      this.createPanel('uap-legislative', () => new UapLegislativePanel());
+      this.createPanel('uap-sensors', () => new UapSensorsPanel());
     }
 
     const defaultOrder = Object.keys(DEFAULT_PANELS).filter(k => k !== 'map');
@@ -989,10 +1016,10 @@ export class PanelLayoutManager implements AppModule {
 
   private filterItemsByTimeRange(items: import('@/types').NewsItem[], range: import('@/components').TimeRange = this.ctx.currentTimeRange): import('@/types').NewsItem[] {
     if (range === 'all') return items;
+    const day = 24 * 60 * 60 * 1000;
     const ranges: Record<string, number> = {
-      '1h': 60 * 60 * 1000, '6h': 6 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000, '48h': 48 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000, 'all': Infinity,
+      '1d': 1 * day, '7d': 7 * day, '30d': 30 * day,
+      '6m': 180 * day, '1y': 365 * day, 'all': Infinity,
     };
     const cutoff = Date.now() - (ranges[range] ?? Infinity);
     return items.filter((item) => {
@@ -1003,9 +1030,9 @@ export class PanelLayoutManager implements AppModule {
 
   private getTimeRangeLabel(): string {
     const labels: Record<string, string> = {
-      '1h': 'the last hour', '6h': 'the last 6 hours',
-      '24h': 'the last 24 hours', '48h': 'the last 48 hours',
-      '7d': 'the last 7 days', 'all': 'all time',
+      '1d': 'the last day', '7d': 'the last 7 days',
+      '30d': 'the last 30 days', '6m': 'the last 6 months',
+      '1y': 'the last year', 'all': 'all time',
     };
     return labels[this.ctx.currentTimeRange] ?? 'the last 7 days';
   }

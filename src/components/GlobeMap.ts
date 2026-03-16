@@ -22,7 +22,7 @@ import { PIPELINES } from '@/config/pipelines';
 import { t } from '@/services/i18n';
 import { SITE_VARIANT } from '@/config/variant';
 import { getGlobeRenderScale, resolveGlobePixelRatio, resolvePerformanceProfile, subscribeGlobeRenderScaleChange, getGlobeTexture, GLOBE_TEXTURE_URLS, subscribeGlobeTextureChange, getGlobeVisualPreset, subscribeGlobeVisualPresetChange, type GlobeRenderScale, type GlobePerformanceProfile, type GlobeVisualPreset } from '@/services/globe-render-settings';
-import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVariant } from '@/config/map-layer-definitions';
+import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, getUapShapeDotColor, type MapVariant } from '@/config/map-layer-definitions';
 import { getSecretState } from '@/services/runtime-config';
 import { resolveTradeRouteSegments, type TradeRouteSegment } from '@/config/trade-routes';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
@@ -152,6 +152,14 @@ interface ProtestMarker extends BaseMarker {
   title: string;
   eventType: string;
   country: string;
+}
+interface UapSightingMarker extends BaseMarker {
+  _kind: 'uapSighting';
+  id: string;
+  description: string;
+  shape: string;
+  /** Unix seconds (occurred) for time-range filter */
+  timestamp?: number;
 }
 interface UcdpMarker extends BaseMarker {
   _kind: 'ucdp';
@@ -378,6 +386,7 @@ type GlobeMarker =
   | ConflictMarker | HotspotMarker | FlightMarker | VesselMarker | ClusterMarker
   | WeatherMarker | NaturalMarker | IranMarker | OutageMarker
   | CyberMarker | FireMarker | ProtestMarker
+  | UapSightingMarker
   | UcdpMarker | DisplacementMarker | ClimateMarker | GpsJamMarker | TechMarker
   | ConflictZoneMarker | MilBaseMarker | NuclearSiteMarker | IrradiatorSiteMarker | SpaceportSiteMarker
   | EarthquakeMarker | EconomicMarker | DatacenterMarker | WaterwayMarker | MineralMarker
@@ -444,6 +453,7 @@ export class GlobeMap {
   private cyberMarkers: CyberMarker[] = [];
   private fireMarkers: FireMarker[] = [];
   private protestMarkers: ProtestMarker[] = [];
+  private uapSightingMarkers: UapSightingMarker[] = [];
   private ucdpMarkers: UcdpMarker[] = [];
   private displacementMarkers: DisplacementMarker[] = [];
   private climateMarkers: ClimateMarker[] = [];
@@ -854,8 +864,7 @@ export class GlobeMap {
     // Navigate to initial view
     this.setView(this.currentView);
 
-    this.layers.dayNight = false;
-    this.hideLayerToggle('dayNight');
+    // dayNight toggle excluded by catalog (renderers: ['flat'])
 
     // Flush any data that arrived before init completed
     this.flushMarkers();
@@ -1007,6 +1016,10 @@ export class GlobeMap {
       const c = typeColors[d.eventType] ?? '#ffaa00';
       el.innerHTML = GlobeMap.wrapHit(`<div style="font-size:11px;color:${c};text-shadow:0 0 4px ${c}88;">📢</div>`);
       el.title = d.title;
+    } else if (d._kind === 'uapSighting') {
+      const uapColor = getUapShapeDotColor(d.shape);
+      el.innerHTML = GlobeMap.wrapHit(`<div style="width:10px;height:10px;border-radius:50%;background:${uapColor};box-shadow:0 0 4px ${uapColor}88;"></div>`);
+      el.title = d.shape ? `${d.shape}: ${d.description.slice(0, 80)}` : d.description.slice(0, 80);
     } else if (d._kind === 'ucdp') {
       const size = Math.min(10, 5 + (d.deaths || 0) * 0.3);
       el.innerHTML = GlobeMap.wrapHit(`
@@ -1305,6 +1318,11 @@ export class GlobeMap {
       html = `<span style="color:${c};font-weight:bold;">📢 ${esc(d.eventType)}</span>` +
              `<br><span style="opacity:.7;">${esc(d.country)}</span>` +
              `<br><span style="opacity:.7;white-space:normal;display:block;">${esc(d.title.slice(0, 70))}</span>`;
+    } else if (d._kind === 'uapSighting') {
+      const uapColor = getUapShapeDotColor(d.shape);
+      html = `<span style="color:${uapColor};font-weight:bold;">🛸 UAP</span>` +
+             (d.shape ? `<br><span style="opacity:.7;">${esc(d.shape)}</span>` : '') +
+             `<br><span style="opacity:.7;white-space:normal;display:block;">${esc(d.description.slice(0, 120))}</span>`;
     } else if (d._kind === 'ucdp') {
       html = `<span style="color:#ff6400;font-weight:bold;">⚔ ${esc(d.country)}</span>` +
              `<br><span style="opacity:.7;">${esc(d.sideA)} vs ${esc(d.sideB)}</span>` +
@@ -1836,6 +1854,7 @@ export class GlobeMap {
     if (this.layers.cyberThreats) markers.push(...this.cyberMarkers);
     if (this.layers.fires) markers.push(...this.fireMarkers);
     if (this.layers.protests) markers.push(...this.protestMarkers);
+    if (this.layers.uapSightings) markers.push(...this.getFilteredUapSightingMarkers());
     if (this.layers.ucdpEvents) markers.push(...this.ucdpMarkers);
     if (this.layers.displacement) markers.push(...this.displacementMarkers);
     if (this.layers.climate) markers.push(...this.climateMarkers);
@@ -2298,7 +2317,7 @@ export class GlobeMap {
 
   public setLayers(layers: MapLayers): void {
     const prev = this.layers;
-    this.layers = { ...layers, dayNight: false };
+    this.layers = { ...layers };
     let needMarkers = false, needArcs = false, needPaths = false, needPolygons = false;
     for (const k of Object.keys(layers) as (keyof MapLayers)[]) {
       if (prev[k] === layers[k]) continue;
@@ -2328,7 +2347,6 @@ export class GlobeMap {
   }
 
   public enableLayer(layer: keyof MapLayers): void {
-    if (layer === 'dayNight') return;
     if (this.layers[layer]) return;
     (this.layers as any)[layer] = true;
     const toggle = this.layerTogglesEl?.querySelector(`.layer-toggle[data-layer="${layer}"] input`) as HTMLInputElement | null;
@@ -2435,10 +2453,33 @@ export class GlobeMap {
 
   public setTimeRange(range: TimeRange): void {
     this.timeRange = range;
+    this.flushMarkers();
   }
 
   public getTimeRange(): TimeRange {
     return this.timeRange;
+  }
+
+  private getUapTimeRangeMs(): number {
+    const day = 24 * 60 * 60 * 1000;
+    const ranges: Record<TimeRange, number> = {
+      '1d': 1 * day,
+      '7d': 7 * day,
+      '30d': 30 * day,
+      '6m': 180 * day,
+      '1y': 365 * day,
+      all: Infinity,
+    };
+    return ranges[this.timeRange];
+  }
+
+  private getFilteredUapSightingMarkers(): UapSightingMarker[] {
+    if (this.timeRange === 'all') return this.uapSightingMarkers;
+    const cutoffMs = Date.now() - this.getUapTimeRangeMs();
+    return this.uapSightingMarkers.filter((m) => {
+      if (m.timestamp == null) return true;
+      return m.timestamp * 1000 >= cutoffMs;
+    });
   }
 
   // ─── Callback setters ─────────────────────────────────────────────────────
@@ -2703,6 +2744,18 @@ export class GlobeMap {
       title: e.title ?? '',
       eventType: e.eventType ?? 'protest',
       country: e.country ?? '',
+    }));
+    this.flushMarkers();
+  }
+  public setUapSightings(sightings: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number }>): void {
+    this.uapSightingMarkers = (sightings ?? []).filter(s => s.lat != null && s.lon != null).map(s => ({
+      _kind: 'uapSighting' as const,
+      _lat: s.lat,
+      _lng: s.lon,
+      id: s.id ?? '',
+      description: s.description ?? '',
+      shape: s.shape ?? '',
+      timestamp: s.timestamp,
     }));
     this.flushMarkers();
   }

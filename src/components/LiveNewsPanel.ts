@@ -174,9 +174,6 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'welt', name: 'WELT', handle: '@WELTVideoTV', fallbackVideoId: 'L-TNmYmaAKQ', geoAvailability: ['DE', 'AT', 'CH'] },
   { id: 'tagesschau24', name: 'Tagesschau24', handle: '@tagesschau', fallbackVideoId: 'fC_q9TkO1uU' },
   { id: 'euronews-fr', name: 'Euronews FR', handle: '@euronewsfr', fallbackVideoId: 'NiRIbKwAejk' },
-  { id: 'euronews-gr', name: 'Euronews GR', handle: '@euronewsgr' },
-  { id: 'skai-tv', name: 'SKAI TV', handle: '@skaitv' },
-  { id: 'ert-news', name: 'ERT News', handle: '@ertgr', hlsUrl: 'https://ertflix.ascdn.broadpeak.io/ertlive/ertnews/default/index.m3u8', useFallbackOnly: true },
   { id: 'france24-fr', name: 'France 24 FR', handle: '@France24_fr', fallbackVideoId: 'l8PMl7tUDIE' },
   { id: 'france-info', name: 'France Info', handle: '@franceinfo', fallbackVideoId: 'Z-Nwo-ypKtM' },
   { id: 'bfmtv', name: 'BFMTV', handle: '@BFMTV', fallbackVideoId: 'smB_F6DW7cI' },
@@ -189,7 +186,7 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
 
 const _REGION_ENTRIES: { key: string; labelKey: string; channelIds: string[] }[] = [
   { key: 'na', labelKey: 'components.liveNews.regionNorthAmerica', channelIds: ['bloomberg', 'cnbc', 'yahoo', 'cnn', 'fox-news', 'newsmax', 'abc-news', 'cbs-news', 'nbc-news', 'cbc-news', 'ctv-news', 'reuters-tv', 'nasa'] },
-  { key: 'eu', labelKey: 'components.liveNews.regionEurope', channelIds: ['sky', 'euronews', 'dw', 'france24', 'bbc-news', 'gb-news', 'the-guardian', 'france24-en', 'phoenix', 'rtp3', 'welt', 'rtve', 'trt-haber', 'ntv-turkey', 'cnn-turk', 'tv-rain', 'rt', 'tvp-info', 'telewizja-republika', 'tagesschau24', 'euronews-fr', 'euronews-gr', 'skai-tv', 'ert-news', 'france24-fr', 'france-info', 'bfmtv', 'tv5monde-info', 'nrk1', 'aljazeera-balkans'] },
+  { key: 'eu', labelKey: 'components.liveNews.regionEurope', channelIds: ['sky', 'euronews', 'dw', 'france24', 'bbc-news', 'gb-news', 'the-guardian', 'france24-en', 'phoenix', 'rtp3', 'welt', 'rtve', 'trt-haber', 'ntv-turkey', 'cnn-turk', 'tv-rain', 'rt', 'tvp-info', 'telewizja-republika', 'tagesschau24', 'euronews-fr', 'france24-fr', 'france-info', 'bfmtv', 'tv5monde-info', 'nrk1', 'aljazeera-balkans'] },
   { key: 'latam', labelKey: 'components.liveNews.regionLatinAmerica', channelIds: ['cnn-brasil', 'jovem-pan', 'record-news', 'band-jornalismo', 'tn-argentina', 'c5n', 'milenio', 'noticias-caracol', 'ntn24', 't13', 'dw-espanol', 'rt-espanol', 'cgtn-espanol'] },
   { key: 'asia', labelKey: 'components.liveNews.regionAsia', channelIds: ['tbs-news', 'ann-news', 'ntv-news', 'cti-news', 'cgtn', 'wion', 'ndtv', 'cna-asia', 'nhk-world', 'arirang-news', 'india-today', 'abp-news'] },
   { key: 'me', labelKey: 'components.liveNews.regionMiddleEast', channelIds: ['alarabiya', 'aljazeera', 'al-hadath', 'sky-news-arabia', 'trt-world', 'iran-intl', 'press-tv', 'cgtn-arabic', 'kan-11', 'i24-news', 'asharq-news', 'aljazeera-arabic', 'aljazeera-mubasher', 'alarabiya-business', 'al-qahera-news', 'dw-arabic', 'rt-arabic', 'rudaw'] },
@@ -315,8 +312,10 @@ export const BUILTIN_IDS = new Set([
   ...OPTIONAL_LIVE_CHANNELS.map((c) => c.id),
 ]);
 
-export function loadChannelsFromStorage(): LiveChannel[] {
-  const stored = loadFromStorage<StoredLiveChannels>(STORAGE_KEYS.liveChannels, DEFAULT_STORED);
+/** Optional suffix for a second Live News panel (e.g. '-2' => worldmonitor-live-channels-2). */
+export function loadChannelsFromStorage(storageSuffix = ''): LiveChannel[] {
+  const key = STORAGE_KEYS.liveChannels + storageSuffix;
+  const stored = loadFromStorage<StoredLiveChannels>(key, DEFAULT_STORED);
   const order = stored.order?.length ? stored.order : DEFAULT_STORED.order;
   const channelMap = new Map<string, LiveChannel>();
   for (const c of FULL_LIVE_CHANNELS) channelMap.set(c.id, { ...c });
@@ -338,7 +337,8 @@ export function loadChannelsFromStorage(): LiveChannel[] {
   return result;
 }
 
-export function saveChannelsToStorage(channels: LiveChannel[]): void {
+export function saveChannelsToStorage(channels: LiveChannel[], storageSuffix = ''): void {
+  const key = STORAGE_KEYS.liveChannels + storageSuffix;
   const order = channels.map((c) => c.id);
   const custom = channels.filter((c) => !BUILTIN_IDS.has(c.id));
   const builtinNames = new Map<string, string>();
@@ -349,11 +349,19 @@ export function saveChannelsToStorage(channels: LiveChannel[]): void {
       displayNameOverrides[c.id] = c.name;
     }
   }
-  saveToStorage(STORAGE_KEYS.liveChannels, { order, custom, displayNameOverrides });
+  saveToStorage(key, { order, custom, displayNameOverrides });
+}
+
+export type LiveNewsPanelKey = 'live-news' | 'live-news-2';
+
+export interface LiveNewsPanelOptions {
+  panelKey?: LiveNewsPanelKey;
 }
 
 export class LiveNewsPanel extends Panel {
   private static apiPromise: Promise<void> | null = null;
+  readonly panelKey: LiveNewsPanelKey;
+  readonly storageSuffix: string;
   private channels: LiveChannel[] = [];
   private activeChannel!: LiveChannel;
   private channelSwitcher: HTMLElement | null = null;
@@ -406,15 +414,20 @@ export class LiveNewsPanel extends Panel {
   private lazyObserver: IntersectionObserver | null = null;
   private idleCallbackId: number | ReturnType<typeof setTimeout> | null = null;
 
-  constructor() {
-    // allow users to close the live news panel
-    super({ id: 'live-news', title: t('panels.liveNews'), className: 'panel-wide', closable: true });
+  constructor(options?: LiveNewsPanelOptions) {
+    const panelKey = options?.panelKey ?? 'live-news';
+    const storageSuffix = panelKey === 'live-news-2' ? '-2' : '';
+    const title = panelKey === 'live-news-2' ? (t('panels.liveNews2') ?? 'Live News 2') : t('panels.liveNews');
+    super({ id: panelKey, title, className: 'panel-wide', closable: true });
+    this.panelKey = panelKey;
+    this.storageSuffix = storageSuffix;
     this.insertLiveCountBadge(OPTIONAL_LIVE_CHANNELS.length);
     this.youtubeOrigin = LiveNewsPanel.resolveYouTubeOrigin();
-    this.playerElementId = `live-news-player-${Date.now()}`;
-    this.channels = loadChannelsFromStorage();
+    this.playerElementId = `live-news-player-${panelKey}-${Date.now()}`;
+    this.channels = loadChannelsFromStorage(this.storageSuffix);
     if (this.channels.length === 0) this.channels = getDefaultLiveChannels();
-    const savedChannelId = loadFromStorage<string>(STORAGE_KEYS.activeChannel, '');
+    const activeKey = STORAGE_KEYS.activeChannel + this.storageSuffix;
+    const savedChannelId = loadFromStorage<string>(activeKey, '');
     const savedChannel = savedChannelId ? this.channels.find(c => c.id === savedChannelId) : null;
     this.activeChannel = savedChannel ?? this.channels[0]!;
     this.createLiveButton();
@@ -489,7 +502,7 @@ export class LiveNewsPanel extends Panel {
   }
 
   private saveChannels(): void {
-    saveChannelsToStorage(this.channels);
+    saveChannelsToStorage(this.channels, this.storageSuffix);
   }
 
   private getDirectHlsUrl(channelId: string): string | undefined {
@@ -922,7 +935,7 @@ export class LiveNewsPanel extends Panel {
     requestAnimationFrame(() => overlay.classList.add('active'));
 
     import('@/live-channels-window').then(async ({ initLiveChannelsWindow }) => {
-      await initLiveChannelsWindow(container);
+      await initLiveChannelsWindow(container, { storageSuffix: this.storageSuffix });
     }).catch(console.error);
 
     const close = () => {
@@ -991,7 +1004,7 @@ export class LiveNewsPanel extends Panel {
     if (channel.id === this.activeChannel.id) return;
 
     this.activeChannel = channel;
-    saveToStorage(STORAGE_KEYS.activeChannel, channel.id);
+    saveToStorage(STORAGE_KEYS.activeChannel + this.storageSuffix, channel.id);
 
     this.channelSwitcher?.querySelectorAll('.live-channel-btn').forEach(btn => {
       const btnEl = btn as HTMLElement;
@@ -1597,7 +1610,7 @@ export class LiveNewsPanel extends Panel {
 
   /** Reload channel list from storage (e.g. after edit in separate channel management window). */
   public refreshChannelsFromStorage(): void {
-    this.channels = loadChannelsFromStorage();
+    this.channels = loadChannelsFromStorage(this.storageSuffix);
     if (this.channels.length === 0) this.channels = getDefaultLiveChannels();
     if (!this.channels.some((c) => c.id === this.activeChannel.id)) {
       this.activeChannel = this.channels[0]!;

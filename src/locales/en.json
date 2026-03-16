@@ -185,6 +185,11 @@
     "sourceRegionDeals": "Deals & Corporate",
     "sourceRegionFinRegulation": "Financial Regulation",
     "sourceRegionGulfMena": "Gulf & MENA",
+    "sourceRegionUapNews": "UAP News",
+    "sourceRegionUapInstitutional": "Institutional (AARO/NASA)",
+    "sourceRegionUapInvestigative": "Investigative",
+    "sourceRegionUapScientific": "Scientific",
+    "sourceRegionUapSightings": "Sightings",
     "filterPanels": "Filter panels...",
     "resetLayout": "Reset Layout",
     "resetLayoutTooltip": "Restore default panel arrangement",
@@ -211,10 +216,13 @@
     "panelCatMining": "Mining & Supply Chain",
     "panelCatCommodityEcon": "Economy & Trade",
     "panelCatHappyNews": "Good News",
-    "panelCatHappyPlanet": "Planet & Giving"
+    "panelCatHappyPlanet": "Planet & Giving",
+    "panelCatUapIntel": "Intel & Institutional",
+    "panelCatUapSightings": "Sightings & Sensors"
   },
   "panels": {
     "liveNews": "Live News",
+    "liveNews2": "Live News 2",
     "markets": "Markets",
     "map": "Global Situation",
     "techMap": "Global Tech",
@@ -234,6 +242,14 @@
     "africa": "Africa",
     "latam": "Latin America",
     "asia": "Asia-Pacific",
+    "uapNews": "UAP News",
+    "uapInstitutional": "Institutional (AARO/NASA)",
+    "uapInvestigative": "Investigative",
+    "uapScientific": "Scientific",
+    "uapSightings": "Sightings",
+    "uapAai": "Anomalous Activity Index",
+    "uapLegislative": "Legislative & Disclosure",
+    "uapSensors": "Sensor Stations",
     "energy": "Energy & Resources",
     "gov": "Government",
     "thinktanks": "Think Tanks",
@@ -805,15 +821,6 @@
       "vesselTransits": "Vessel Transits (180d)",
       "riskLevel": "Risk level",
       "routingAction": "Routing",
-      "disruption": "Disruption",
-      "vessels": "vessels",
-      "incidents7d": "incidents (7d)",
-      "containerRates": "Container Rates",
-      "bulkShipping": "Bulk Shipping",
-      "economicIndicators": "Economic Indicators",
-      "corridorDisruption": "Corridor Disruption",
-      "corridor": "Corridor",
-      "loadingCorridors": "Loading corridor data...",
       "mineral": "Mineral",
       "topProducers": "Top Producers",
       "risk": "Risk",
@@ -839,17 +846,7 @@
       "highTariff": "High",
       "moderateTariff": "Moderate",
       "lowTariff": "Low",
-      "revenue": "US Revenue",
-      "noRevenueData": "No customs revenue data available",
-      "treasuryUnavailable": "Treasury data temporarily unavailable",
-      "fytdLabel": "FY{{year}} YTD",
-      "vsPriorFy": "vs FY{{year}}",
-      "sourceWto": "WTO",
-      "sourceTreasury": "US Treasury",
-      "colDate": "Date",
-      "colMonthly": "Monthly",
-      "colFytd": "FY YTD",
-      "infoTooltip": "<strong>Trade Policy</strong> WTO trade monitoring:<ul><li><strong>Restrictions</strong>: Active trade measures by country and sector</li><li><strong>Tariffs</strong>: Applied tariff rate trends by year</li><li><strong>Trade Flows</strong>: Export/import volumes with year-over-year changes</li><li><strong>Barriers</strong>: Technical barriers to trade (TBT/SPS notifications)</li><li><strong>Revenue</strong>: Monthly US customs duties revenue (US Treasury MTS data)</li></ul>"
+      "infoTooltip": "<strong>Trade Policy</strong> WTO trade monitoring:<ul><li><strong>Restrictions</strong>: Active trade measures by country and sector</li><li><strong>Tariffs</strong>: Applied tariff rate trends by year</li><li><strong>Trade Flows</strong>: Export/import volumes with year-over-year changes</li><li><strong>Barriers</strong>: Technical barriers to trade (TBT/SPS notifications)</li></ul>"
     },
     "gdelt": {
       "empty": "No recent articles for this topic"
@@ -872,10 +869,7 @@
       "yes": "Yes",
       "no": "No",
       "vol": "Vol",
-      "closes": "Closes",
-      "leanYes": "Lean Yes",
-      "leanNo": "Lean No",
-      "tossUp": "Toss-up"
+      "closes": "Closes"
     },
     "stablecoins": {
       "pegHealth": "Peg Health",
@@ -1109,7 +1103,10 @@
         "kindness": "Acts of Kindness",
         "happiness": "World Happiness",
         "speciesRecovery": "Species Recovery",
-        "renewableInstallations": "Clean Energy"
+        "renewableInstallations": "Clean Energy",
+        "uapSightings": "UAP Sightings",
+        "uapSensorStations": "Sensor Stations",
+        "uapHistoricalHotspots": "Historical Hotspots"
       },
       "tooltip": {
         "earthquake": "Earthquake",
@@ -1673,20 +1670,11 @@
       },
       "infoTooltip": "<strong>Market Radar</strong> Composite signal dashboard for crypto macro positioning:<ul><li><strong>Liquidity</strong>: Net Fed liquidity proxy</li><li><strong>Flow</strong>: BTC vs QQQ 5-day returns</li><li><strong>Regime</strong>: QQQ vs XLP rotation (risk-on/off)</li><li><strong>BTC Trend</strong>: Price vs SMA50/200, Mayer Multiple</li><li><strong>Hash Rate</strong>: 30-day network hash change</li><li><strong>Fear & Greed</strong>: Market sentiment index</li></ul>Verdict: BUY when majority signals bullish, CASH otherwise."
     },
-    "forecast": {
-      "infoTooltip": "<strong>AI Forecasts</strong> AI-generated probability estimates for geopolitical and economic events:<ul><li>Cross-domain coverage: conflict, markets, supply chain, cyber, political</li><li>Each forecast shows estimated probability, confidence level, and time horizon</li><li>Calibrated against prediction market baselines where available</li></ul>Forecasts update as new intelligence signals arrive. Filter by domain using the tabs above."
-    },
     "escalationCorrelation": {
       "infoTooltip": "<strong>Escalation Monitor</strong> Detects converging geopolitical signals:<ul><li>Correlates military movements, conflict events, and news spikes</li><li>Scores convergence zones by severity (critical/high/medium/low)</li><li>Tracks escalation or de-escalation trends over time</li></ul>Click a card to zoom to the region on the map."
     },
     "economicCorrelation": {
       "infoTooltip": "<strong>Economic Warfare</strong> Detects converging economic pressure signals:<ul><li>Sanctions, trade restrictions, and currency movements</li><li>Commodity disruptions linked to geopolitical actors</li><li>Cross-domain correlation between economic and security events</li></ul>Click a card to zoom to the affected region."
-    },
-    "militaryCorrelation": {
-      "infoTooltip": "<strong>Force Posture</strong> Correlates military activity with geopolitical context:<ul><li>Military aircraft and naval vessel concentrations by region</li><li>Cross-references with active conflict zones and news spikes</li><li>Highlights unusual force buildups or repositioning</li></ul>Click a card to zoom to the region on the map."
-    },
-    "disasterCorrelation": {
-      "infoTooltip": "<strong>Disaster Cascade</strong> Detects converging natural disaster and infrastructure signals:<ul><li>Correlates earthquakes, wildfires, floods, and weather extremes</li><li>Tracks cascading effects on infrastructure and supply chains</li><li>Highlights regions with compounding disaster risk</li></ul>Click a card to zoom to the affected region."
     },
     "markets": {
       "infoTooltip": "<strong>Markets</strong> Real-time stock indices, equities, and crypto prices. Customize your watchlist with the Watchlist button. Sparklines show recent price trend."

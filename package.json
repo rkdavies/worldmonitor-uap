@@ -1,7 +1,7 @@
 {
   "name": "world-monitor",
   "private": true,
-  "version": "2.6.5",
+  "version": "2.6.1",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
@@ -16,6 +16,8 @@
     "dev:finance": "cross-env VITE_VARIANT=finance vite",
     "dev:happy": "cross-env VITE_VARIANT=happy vite",
     "dev:commodity": "cross-env VITE_VARIANT=commodity vite",
+    "dev:uap": "npx cross-env VITE_VARIANT=uap vite",
+    "generate": "make generate",
     "postinstall": "cd blog-site && npm ci --prefer-offline",
     "build:blog": "cd blog-site && npm run build && rm -rf ../public/blog && mkdir -p ../public/blog && cp -r dist/* ../public/blog/",
     "build:pro": "cd pro-test && npm install && npm run build",
@@ -58,7 +60,8 @@
     "desktop:package:macos:tech:sign": "node scripts/desktop-package.mjs --os macos --variant tech --sign",
     "desktop:package:windows:full:sign": "node scripts/desktop-package.mjs --os windows --variant full --sign",
     "desktop:package:windows:tech:sign": "node scripts/desktop-package.mjs --os windows --variant tech --sign",
-    "desktop:package": "node scripts/desktop-package.mjs"
+    "desktop:package": "node scripts/desktop-package.mjs",
+    "seed:uap-geocode": "tsx scripts/seed-uap-geocode.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.7",
@@ -86,7 +89,6 @@
     "vite-plugin-pwa": "^1.2.0"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1009.0",
     "@deck.gl/aggregation-layers": "^9.2.6",
     "@deck.gl/core": "^9.2.6",
     "@deck.gl/geo-layers": "^9.2.6",

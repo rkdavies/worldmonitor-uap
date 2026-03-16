@@ -14,7 +14,8 @@
   <a href="https://tech.worldmonitor.app"><img src="https://img.shields.io/badge/Tech_Variant-tech.worldmonitor.app-0891b2?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Tech Variant"></a>&nbsp;
   <a href="https://finance.worldmonitor.app"><img src="https://img.shields.io/badge/Finance_Variant-finance.worldmonitor.app-059669?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Finance Variant"></a>&nbsp;
   <a href="https://commodity.worldmonitor.app"><img src="https://img.shields.io/badge/Commodity_Variant-commodity.worldmonitor.app-b45309?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Commodity Variant"></a>&nbsp;
-  <a href="https://happy.worldmonitor.app"><img src="https://img.shields.io/badge/Happy_Variant-happy.worldmonitor.app-f59e0b?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Happy Variant"></a>
+  <a href="https://happy.worldmonitor.app"><img src="https://img.shields.io/badge/Happy_Variant-happy.worldmonitor.app-f59e0b?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Happy Variant"></a>&nbsp;
+  <a href="https://uap.worldmonitor.app"><img src="https://img.shields.io/badge/UAP_Variant-uap.worldmonitor.app-7c3aed?style=for-the-badge&logo=googlechrome&logoColor=white" alt="UAP Variant"></a>
 </p>
 
 <p align="center">
@@ -41,8 +42,9 @@
 - **Cross-stream correlation** — military, economic, disaster, and escalation signal convergence
 - **Country Intelligence Index** — composite risk scoring across 12 signal categories
 - **Finance radar** — 92 stock exchanges, commodities, crypto, and 7-signal market composite
+- **UAP situational awareness** — institutional (NASA, AARO, GEIPAN), investigative feeds, Anomalous Activity Index, sensor stations, and sighting layers
 - **Local AI** — run everything with Ollama, no API keys required
-- **5 site variants** from a single codebase (world, tech, finance, commodity, happy)
+- **6 site variants** from a single codebase (world, tech, finance, commodity, happy, uap)
 - **Native desktop app** (Tauri 2) for macOS, Windows, and Linux
 - **21 languages** with native-language feeds and RTL support
 
@@ -56,10 +58,21 @@ For the full feature list, architecture, data sources, and algorithms, see the *
 git clone https://github.com/koala73/worldmonitor.git
 cd worldmonitor
 npm install
+npm run generate   # generate proto stubs (requires Go + buf; see below)
 npm run dev
 ```
 
 Open [localhost:5173](http://localhost:5173). No environment variables required for basic operation.
+
+**If you see errors about missing `src/generated/server/...`**, the proto-generated stubs are missing. You need **Go 1.23 or newer** (for the sebuf plugin dependencies). Install from [go.dev/dl](https://go.dev/dl/) or `brew install go`, then run:
+
+```bash
+make install-buf install-plugins   # install buf CLI and sebuf protoc plugins (one-time)
+make deps                          # fetch buf proto dependencies
+make generate                      # generate TypeScript client/server stubs
+```
+
+Ensure `$HOME/go/bin` (or `$GOPATH/bin`) is on your `PATH` so `buf` and the plugins are found. Then run `npm run dev` again.
 
 For variant-specific development:
 
@@ -68,6 +81,7 @@ npm run dev:tech       # tech.worldmonitor.app
 npm run dev:finance    # finance.worldmonitor.app
 npm run dev:commodity  # commodity.worldmonitor.app
 npm run dev:happy      # happy.worldmonitor.app
+npm run dev:uap        # uap.worldmonitor.app — UAP situational awareness
 ```
 
 See the **[self-hosting guide](https://docs.worldmonitor.app/getting-started)** for deployment options (Vercel, Docker, static).
@@ -141,7 +155,8 @@ See our [Security Policy](./SECURITY.md) for responsible disclosure guidelines.
   <a href="https://worldmonitor.app">worldmonitor.app</a> &nbsp;·&nbsp;
   <a href="https://docs.worldmonitor.app">docs.worldmonitor.app</a> &nbsp;·&nbsp;
   <a href="https://finance.worldmonitor.app">finance.worldmonitor.app</a> &nbsp;·&nbsp;
-  <a href="https://commodity.worldmonitor.app">commodity.worldmonitor.app</a>
+  <a href="https://commodity.worldmonitor.app">commodity.worldmonitor.app</a> &nbsp;·&nbsp;
+  <a href="https://uap.worldmonitor.app">uap.worldmonitor.app</a>
 </p>
 
 ## Star History

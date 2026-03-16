@@ -44,6 +44,7 @@ import {
   CENTRAL_BANKS,
   COMMODITY_HUBS,
 } from '@/config';
+import { UAP_LEGEND_ENTRIES } from '@/config/map-layer-definitions';
 import { pinWebcam, isPinned } from '@/services/webcams/pinned-store';
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
 import { tokenizeForMatch, matchKeyword, findMatchingKeywords } from '@/utils/keyword-match';
@@ -61,7 +62,7 @@ import { getCountryAtCoordinates, getCountryBbox } from '@/services/country-geom
 import type { CountryClickPayload } from './DeckGLMap';
 import { t } from '@/services/i18n';
 
-export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
+export type TimeRange = '1d' | '7d' | '30d' | '6m' | '1y' | 'all';
 export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 
 interface MapState {
@@ -299,11 +300,11 @@ export class MapComponent {
     slider.id = 'timeSlider';
 
     const ranges: { value: TimeRange; label: string }[] = [
-      { value: '1h', label: '1H' },
-      { value: '6h', label: '6H' },
-      { value: '24h', label: '24H' },
-      { value: '48h', label: '48H' },
+      { value: '1d', label: '1D' },
       { value: '7d', label: '7D' },
+      { value: '30d', label: '30D' },
+      { value: '6m', label: '6M' },
+      { value: '1y', label: '1Y' },
       { value: 'all', label: 'ALL' },
     ];
 
@@ -349,12 +350,13 @@ export class MapComponent {
   }
 
   private getTimeRangeMs(): number {
+    const day = 24 * 60 * 60 * 1000;
     const ranges: Record<TimeRange, number> = {
-      '1h': 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000,
-      '48h': 48 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
+      '1d': 1 * day,
+      '7d': 7 * day,
+      '30d': 30 * day,
+      '6m': 180 * day,
+      '1y': 365 * day,
       'all': Infinity,
     };
     return ranges[this.state.timeRange];
@@ -396,7 +398,11 @@ export class MapComponent {
     const happyLayers: (keyof MapLayers)[] = [
       'positiveEvents', 'kindness', 'happiness', 'speciesRecovery', 'renewableInstallations',
     ];
-    const layers = SITE_VARIANT === 'tech' ? techLayers : SITE_VARIANT === 'finance' ? financeLayers : SITE_VARIANT === 'happy' ? happyLayers : fullLayers;
+    const uapLayers: (keyof MapLayers)[] = [
+      'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots',
+      'nuclear', 'bases', 'military', 'conflicts', 'weather', 'dayNight',
+    ];
+    const layers = SITE_VARIANT === 'tech' ? techLayers : SITE_VARIANT === 'finance' ? financeLayers : SITE_VARIANT === 'happy' ? happyLayers : SITE_VARIANT === 'uap' ? uapLayers : fullLayers;
     const layerLabelKeys: Partial<Record<keyof MapLayers, string>> = {
       hotspots: 'components.deckgl.layers.intelHotspots',
       conflicts: 'components.deckgl.layers.conflictZones',
@@ -427,6 +433,9 @@ export class MapComponent {
       iranAttacks: 'components.deckgl.layers.iranAttacks',
       gpsJamming: 'components.deckgl.layers.gpsJamming',
       ciiChoropleth: 'components.deckgl.layers.ciiChoropleth',
+      uapSightings: 'components.deckgl.layers.uapSightings',
+      uapSensorStations: 'components.deckgl.layers.uapSensorStations',
+      uapHistoricalHotspots: 'components.deckgl.layers.uapHistoricalHotspots',
     };
     const getLayerLabel = (layer: keyof MapLayers): string => {
       if (layer === 'sanctions') return t('components.deckgl.layerHelp.labels.sanctions');
@@ -658,6 +667,11 @@ export class MapComponent {
         <div class="map-legend-item"><span class="map-legend-icon" style="color:#a855f7">📅</span>${escapeHtml(t('components.deckgl.layers.techEvents').toUpperCase())}</div>
         <div class="map-legend-item"><span class="map-legend-icon" style="color:#4ecdc4">💾</span>${escapeHtml(t('components.deckgl.layers.aiDataCenters').toUpperCase())}</div>
       `;
+    } else if (SITE_VARIANT === 'uap') {
+      // UAP variant — NUFORC shape categories by color (matches map dots)
+      legend.innerHTML = UAP_LEGEND_ENTRIES
+        .map(({ label, dotColor }) => `<div class="map-legend-item"><span class="legend-dot" style="background:${dotColor}"></span>${escapeHtml(label)}</div>`)
+        .join('');
     } else if (SITE_VARIANT === 'happy') {
       // Happy variant legend — natural events only
       legend.innerHTML = `
@@ -1398,8 +1412,8 @@ export class MapComponent {
       this.renderPorts(projection);
     }
 
-    // APT groups (geopolitical variant only)
-    if (SITE_VARIANT !== 'tech') {
+    // APT groups (geopolitical variant only, gated by Cyber Threats layer)
+    if (this.state.layers.cyberThreats && SITE_VARIANT !== 'tech') {
       this.renderAPTMarkers(projection);
     }
 
@@ -3872,6 +3886,11 @@ export class MapComponent {
 
   public setProtests(events: SocialUnrestEvent[]): void {
     this.protests = events;
+    this.render();
+  }
+
+  public setUapSightings(_sightings: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string }>): void {
+    // SVG map does not render UAP sightings layer; Deck/Globe do.
     this.render();
   }
 

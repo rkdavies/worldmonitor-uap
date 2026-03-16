@@ -3,7 +3,7 @@ import type { MapLayers } from '@/types';
 import { isDesktopRuntime } from '@/services/runtime';
 
 export type MapRenderer = 'flat' | 'globe';
-export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity';
+export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity' | 'uap';
 
 const _desktop = isDesktopRuntime();
 
@@ -78,7 +78,109 @@ export const LAYER_REGISTRY: Record<keyof MapLayers, LayerDefinition> = {
   processingPlants:         def('processingPlants',         '&#127981;', 'processingPlants',         'Processing Plants'),
   commodityPorts:           def('commodityPorts',           '&#9973;',   'commodityPorts',           'Commodity Ports'),
   webcams:                  def('webcams',                  '&#128247;', 'webcams',                  'Live Webcams'),
+  uapSightings:             def('uapSightings',             '&#128760;', 'uapSightings',            'UAP Sightings'),
+  uapSensorStations:        def('uapSensorStations',        '&#128225;', 'uapSensorStations',       'Sensor Stations'),
+  uapHistoricalHotspots:    def('uapHistoricalHotspots',   '&#128293;', 'uapHistoricalHotspots',   'Historical Hotspots'),
 };
+
+/**
+ * NUFORC shape categories for UAP map legend and dot color.
+ * Aligned with https://nuforc.org/ndx/?id=shape. Combined groups use a single general descriptor.
+ */
+export const UAP_LEGEND_ENTRIES: Array<{ label: string; dotColor: string }> = [
+  { label: 'Oval', dotColor: 'rgb(160, 220, 120)' },
+  { label: 'Orb', dotColor: 'rgb(255, 100, 80)' },
+  { label: 'Cylinder', dotColor: 'rgb(180, 100, 50)' },
+  { label: 'Triangle', dotColor: 'rgb(80, 200, 120)' },
+  { label: 'Fireball', dotColor: 'rgb(255, 80, 60)' },
+  { label: 'Light', dotColor: 'rgb(255, 220, 100)' },
+  { label: 'Formation', dotColor: 'rgb(100, 150, 255)' },
+  { label: 'Chevron', dotColor: 'rgb(255, 180, 60)' },
+  { label: 'Rectangle', dotColor: 'rgb(180, 120, 220)' },
+  { label: 'Changing', dotColor: 'rgb(200, 100, 200)' },
+  { label: 'Diamond', dotColor: 'rgb(100, 200, 180)' },
+  { label: 'Cone', dotColor: 'rgb(150, 150, 200)' },
+  { label: 'Cross', dotColor: 'rgb(180, 180, 180)' },
+  { label: 'Cube', dotColor: 'rgb(120, 120, 140)' },
+  { label: 'Star', dotColor: 'rgb(255, 200, 100)' },
+  { label: 'Other', dotColor: 'rgb(100, 100, 120)' },
+  { label: 'Unknown', dotColor: 'rgb(140, 140, 160)' },
+  { label: 'Unspecified', dotColor: 'rgb(130, 130, 150)' },
+];
+
+function uapShapeKey(label: string): string {
+  return label.toLowerCase().trim().replace(/\s+/g, '').replace(/-/g, '').replace(/\//g, '');
+}
+const UAP_SHAPE_TO_DOT_COLOR = new Map(
+  UAP_LEGEND_ENTRIES.map((e) => [uapShapeKey(e.label), e.dotColor])
+);
+
+// Map NUFORC shape names to combined or distinct legend entries (see nuforc.org/ndx/?id=shape)
+const UAP_SHAPE_ALIASES: Array<{ legendKey: string; aliases: string[] }> = [
+  { legendKey: 'oval', aliases: ['egg', 'oval', 'eggs', 'ovals', 'eggshaped', 'teardrop', 'teardrops'] },
+  { legendKey: 'orb', aliases: ['circle', 'disk', 'sphere', 'orb', 'circles', 'disks', 'spheres', 'orbs'] },
+  { legendKey: 'cylinder', aliases: ['cigar', 'cylinder', 'cigars', 'cylinders'] },
+  { legendKey: 'light', aliases: ['light', 'lights', 'flash', 'flashes'] },
+  { legendKey: 'triangle', aliases: ['triangles'] },
+  { legendKey: 'fireball', aliases: ['fireballs'] },
+  { legendKey: 'formation', aliases: ['formations'] },
+  { legendKey: 'chevron', aliases: ['chevrons'] },
+  { legendKey: 'rectangle', aliases: ['rectangles'] },
+];
+for (const { legendKey, aliases } of UAP_SHAPE_ALIASES) {
+  const color = UAP_SHAPE_TO_DOT_COLOR.get(legendKey);
+  if (color) for (const a of aliases) UAP_SHAPE_TO_DOT_COLOR.set(a, color);
+}
+
+const orbEntry = UAP_LEGEND_ENTRIES.find((e) => uapShapeKey(e.label) === 'orb');
+const ovalEntry = UAP_LEGEND_ENTRIES.find((e) => uapShapeKey(e.label) === 'oval');
+const cylinderEntry = UAP_LEGEND_ENTRIES.find((e) => uapShapeKey(e.label) === 'cylinder');
+const lightEntry = UAP_LEGEND_ENTRIES.find((e) => uapShapeKey(e.label) === 'light');
+const UAP_DEFAULT_DOT_COLOR = 'rgb(124, 58, 237)';
+
+/** If exact key not in map, try substring match for combined shapes (e.g. "light orb", "egg shaped"). */
+function uapShapeFallback(key: string): string | null {
+  if (orbEntry && (key.includes('orb') || key.includes('sphere') || key.includes('circle') || key.includes('disk'))) return orbEntry.dotColor;
+  if (ovalEntry && (key.includes('egg') || key.includes('oval') || key.includes('teardrop'))) return ovalEntry.dotColor;
+  if (cylinderEntry && (key.includes('cigar') || key.includes('cylinder'))) return cylinderEntry.dotColor;
+  if (lightEntry && (key.includes('light') || key.includes('flash'))) return lightEntry.dotColor;
+  return null;
+}
+
+/** Resolve NUFORC shape string to dot color (rgb string) for map and legend. */
+export function getUapShapeDotColor(shape: string | undefined | null): string {
+  if (shape == null || shape === '') return UAP_DEFAULT_DOT_COLOR;
+  const key = uapShapeKey(shape);
+  return UAP_SHAPE_TO_DOT_COLOR.get(key) ?? uapShapeFallback(key) ?? UAP_DEFAULT_DOT_COLOR;
+}
+
+/** Build alias -> legend label map for resolving raw shape to display label. */
+const UAP_SHAPE_TO_LEGEND_LABEL = new Map<string, string>();
+for (const { legendKey, aliases } of UAP_SHAPE_ALIASES) {
+  const entry = UAP_LEGEND_ENTRIES.find((e) => uapShapeKey(e.label) === legendKey);
+  if (entry) for (const a of aliases) UAP_SHAPE_TO_LEGEND_LABEL.set(a, entry.label);
+}
+for (const e of UAP_LEGEND_ENTRIES) UAP_SHAPE_TO_LEGEND_LABEL.set(uapShapeKey(e.label), e.label);
+
+/** Resolve raw NUFORC shape string to the canonical legend label (e.g. "Teardrop" -> "Oval"). */
+export function getUapShapeLegendLabel(shape: string | undefined | null): string | null {
+  if (shape == null || shape === '') return null;
+  const key = uapShapeKey(shape);
+  const label = UAP_SHAPE_TO_LEGEND_LABEL.get(key);
+  if (label) return label;
+  if (key.includes('orb') || key.includes('sphere') || key.includes('circle') || key.includes('disk')) return 'Orb';
+  if (key.includes('egg') || key.includes('oval') || key.includes('teardrop')) return 'Oval';
+  if (key.includes('cigar') || key.includes('cylinder')) return 'Cylinder';
+  if (key.includes('light') || key.includes('flash')) return 'Light';
+  return null;
+}
+
+/** Parse rgb(r,g,b) to [r,g,b,a] for deck.gl getFillColor. */
+export function parseRgbToRgba(rgb: string, a = 200): [number, number, number, number] {
+  const m = /rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/.exec(rgb);
+  if (m) return [Number(m[1]), Number(m[2]), Number(m[3]), a];
+  return [124, 58, 237, a];
+}
 
 const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
   full: [
@@ -90,6 +192,7 @@ const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
     'outages', 'cyberThreats', 'natural', 'fires',
     'waterways', 'economic', 'minerals', 'gpsJamming',
     'satellites', 'ciiChoropleth', 'dayNight', 'webcams',
+    'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots',
   ],
   tech: [
     'startupHubs', 'techHQs', 'accelerators', 'cloudRegions',
@@ -112,12 +215,18 @@ const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
     'ais', 'economic', 'fires', 'climate',
     'natural', 'weather', 'outages', 'dayNight',
   ],
+  uap: [
+    'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots',
+    'nuclear', 'bases', 'military', 'conflicts',
+    'weather', 'dayNight',
+  ],
 };
 
 const SVG_ONLY_LAYERS: Partial<Record<MapVariant, Array<keyof MapLayers>>> = {
   full: ['sanctions'],
   finance: ['sanctions'],
   commodity: ['sanctions'],
+  uap: [],
 };
 
 const I18N_PREFIX = 'components.deckgl.layers.';

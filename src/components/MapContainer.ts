@@ -44,7 +44,7 @@ import type { IranEvent } from '@/services/conflict';
 import type { ImageryScene } from '@/generated/server/worldmonitor/imagery/v1/service_server';
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
 
-export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
+export type TimeRange = '1d' | '7d' | '30d' | '6m' | '1y' | 'all';
 export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
 
 export interface MapContainerState {
@@ -107,6 +107,7 @@ export class MapContainer {
   private cachedRepairShips: RepairShip[] | null = null;
   private cachedCableHealth: Record<string, CableHealthRecord> | null = null;
   private cachedProtests: SocialUnrestEvent[] | null = null;
+  private cachedUapSightings: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string }> | null = null;
   private cachedFlightDelays: AirportDelayAlert[] | null = null;
   private cachedAircraftPositions: PositionSample[] | null = null;
   private cachedMilitaryFlights: MilitaryFlight[] | null = null;
@@ -273,6 +274,7 @@ export class MapContainer {
     if (this.cachedCableAdvisories != null && this.cachedRepairShips != null) this.setCableActivity(this.cachedCableAdvisories, this.cachedRepairShips);
     if (this.cachedCableHealth) this.setCableHealth(this.cachedCableHealth);
     if (this.cachedProtests) this.setProtests(this.cachedProtests);
+    if (this.cachedUapSightings) this.setUapSightings(this.cachedUapSightings);
     if (this.cachedFlightDelays) this.setFlightDelays(this.cachedFlightDelays);
     if (this.cachedAircraftPositions) this.setAircraftPositions(this.cachedAircraftPositions);
     if (this.cachedMilitaryFlights) this.setMilitaryFlights(this.cachedMilitaryFlights, this.cachedMilitaryFlightClusters ?? []);
@@ -466,6 +468,49 @@ export class MapContainer {
     } else {
       this.svgMap?.setProtests(events);
     }
+  }
+
+  /** UAP sightings (e.g. from NUFORC) for the uapSightings map layer. timestamp = Unix seconds (occurred). */
+  public setUapSightings(sightings: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number }>): void {
+    const jittered = MapContainer.applyUapDuplicateJitter(sightings ?? []);
+    this.cachedUapSightings = jittered;
+    if (this.useGlobe) { this.globeMap?.setUapSightings(jittered); return; }
+    if (this.useDeckGL) {
+      this.deckGLMap?.setUapSightings(jittered);
+    } else {
+      this.svgMap?.setUapSightings(jittered);
+    }
+  }
+
+  /** Spread duplicate (lat,lon) so multiple sightings at the same point are all visible. */
+  private static applyUapDuplicateJitter(
+    sightings: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number }>,
+  ): Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number }> {
+    const JITTER_DEG = 0.008; // ~0.9 km
+    const key = (lat: number, lon: number) => `${lat.toFixed(4)}|${lon.toFixed(4)}`;
+    const byKey = new Map<string, typeof sightings>();
+    for (const s of sightings) {
+      if (s.lat == null || s.lon == null) continue;
+      const k = key(s.lat, s.lon);
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k)!.push(s);
+    }
+    const out: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number }> = [];
+    for (const group of byKey.values()) {
+      if (group.length <= 1) {
+        out.push(...group);
+        continue;
+      }
+      for (let i = 0; i < group.length; i++) {
+        const s = group[i]!;
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        const offsetLat = (row - 1) * JITTER_DEG;
+        const offsetLon = (col - 1) * JITTER_DEG;
+        out.push({ ...s, lat: s.lat + offsetLat, lon: s.lon + offsetLon });
+      }
+    }
+    return out;
   }
 
   public setFlightDelays(delays: AirportDelayAlert[]): void {
@@ -938,6 +983,7 @@ export class MapContainer {
     this.cachedRepairShips = null;
     this.cachedCableHealth = null;
     this.cachedProtests = null;
+    this.cachedUapSightings = null;
     this.cachedFlightDelays = null;
     this.cachedAircraftPositions = null;
     this.cachedMilitaryFlights = null;

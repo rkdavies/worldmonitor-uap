@@ -13,6 +13,7 @@ const _desktop = isDesktopRuntime();
 const FULL_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 1 },
   'windy-webcams': { name: 'Windy Live Webcam', enabled: false, priority: 2 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
@@ -66,6 +67,8 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'airline-intel': { name: 'Airline Intelligence', enabled: true, priority: 2 },
   'tech-readiness': { name: 'Tech Readiness Index', enabled: true, priority: 2 },
   'world-clock': { name: 'World Clock', enabled: true, priority: 2 },
+  'uap-news': { name: 'UAP News', enabled: false, priority: 2 },
+  'uap-aai': { name: 'Anomalous Activity Index', enabled: false, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
@@ -126,6 +129,9 @@ const FULL_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 const FULL_MOBILE_MAP_LAYERS: MapLayers = {
@@ -186,6 +192,9 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 // ============================================
@@ -194,6 +203,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
 const TECH_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Tech Map', enabled: true, priority: 1 },
   'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   'windy-webcams': { name: 'Windy Live Webcam', enabled: false, priority: 2 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
@@ -289,6 +299,9 @@ const TECH_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 const TECH_MOBILE_MAP_LAYERS: MapLayers = {
@@ -349,6 +362,9 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 // ============================================
@@ -357,6 +373,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
 const FINANCE_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Markets Map', enabled: true, priority: 1 },
   'live-news': { name: 'Market Headlines', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   'windy-webcams': { name: 'Windy Live Webcam', enabled: false, priority: 2 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
@@ -453,6 +470,9 @@ const FINANCE_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
@@ -513,6 +533,9 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 // ============================================
@@ -589,6 +612,9 @@ const HAPPY_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
@@ -649,6 +675,9 @@ const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 // ============================================
@@ -657,6 +686,7 @@ const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
 const COMMODITY_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Commodity Map', enabled: true, priority: 1 },
   'live-news': { name: 'Commodity Headlines', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
   insights: { name: 'AI Commodity Insights', enabled: true, priority: 1 },
   'commodity-news': { name: 'Commodity News', enabled: true, priority: 1 },
   'gold-silver': { name: 'Gold & Silver', enabled: true, priority: 1 },
@@ -739,6 +769,9 @@ const COMMODITY_MAP_LAYERS: MapLayers = {
   processingPlants: true,
   commodityPorts: true,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
 };
 
 const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
@@ -799,6 +832,91 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: true,
   webcams: false,
+  uapSightings: false,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
+};
+
+// ============================================
+// UAP VARIANT (Unidentified Anomalous Phenomena)
+// ============================================
+const UAP_PANELS: Record<string, PanelConfig> = {
+  map: { name: 'Global Map', enabled: true, priority: 1 },
+  'live-news': { name: 'Live News', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
+  intel: { name: 'Intel Feed', enabled: true, priority: 1 },
+  'uap-news': { name: 'UAP News', enabled: true, priority: 1 },
+  'uap-institutional': { name: 'Institutional (AARO/NASA)', enabled: true, priority: 1 },
+  'uap-investigative': { name: 'Investigative', enabled: true, priority: 1 },
+  'uap-scientific': { name: 'Scientific', enabled: true, priority: 2 },
+  'uap-sightings': { name: 'Sightings', enabled: true, priority: 1 },
+  'uap-aai': { name: 'Anomalous Activity Index', enabled: true, priority: 1 },
+  'uap-legislative': { name: 'Legislative & Disclosure', enabled: true, priority: 2 },
+  'uap-sensors': { name: 'Sensor Stations', enabled: true, priority: 2 },
+  'world-clock': { name: 'World Clock', enabled: true, priority: 2 },
+};
+
+const UAP_MAP_LAYERS: MapLayers = {
+  iranAttacks: false,
+  gpsJamming: false,
+  satellites: false,
+  conflicts: true,
+  bases: true,
+  cables: false,
+  pipelines: false,
+  hotspots: false,
+  ais: false,
+  nuclear: true,
+  irradiators: false,
+  sanctions: false,
+  weather: true,
+  economic: false,
+  waterways: false,
+  outages: false,
+  cyberThreats: false,
+  datacenters: false,
+  protests: false,
+  flights: false,
+  military: true,
+  natural: false,
+  spaceports: false,
+  minerals: false,
+  fires: false,
+  ucdpEvents: false,
+  displacement: false,
+  climate: false,
+  startupHubs: false,
+  cloudRegions: false,
+  accelerators: false,
+  techHQs: false,
+  techEvents: false,
+  stockExchanges: false,
+  financialCenters: false,
+  centralBanks: false,
+  commodityHubs: false,
+  gulfInvestments: false,
+  positiveEvents: false,
+  kindness: false,
+  happiness: false,
+  speciesRecovery: false,
+  renewableInstallations: false,
+  tradeRoutes: false,
+  ciiChoropleth: false,
+  dayNight: true,
+  miningSites: false,
+  processingPlants: false,
+  commodityPorts: false,
+  webcams: false,
+  uapSightings: true,
+  uapSensorStations: true,
+  uapHistoricalHotspots: true,
+};
+
+const UAP_MOBILE_MAP_LAYERS: MapLayers = {
+  ...UAP_MAP_LAYERS,
+  uapSightings: true,
+  uapSensorStations: false,
+  uapHistoricalHotspots: true,
 };
 
 // ============================================
@@ -812,7 +930,9 @@ export const DEFAULT_PANELS = SITE_VARIANT === 'happy'
       ? FINANCE_PANELS 
       : SITE_VARIANT === 'commodity'
         ? COMMODITY_PANELS
-        : FULL_PANELS;
+        : SITE_VARIANT === 'uap'
+          ? UAP_PANELS
+          : FULL_PANELS;
 
 export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' 
   ? HAPPY_MAP_LAYERS 
@@ -822,7 +942,9 @@ export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy'
       ? FINANCE_MAP_LAYERS 
       : SITE_VARIANT === 'commodity'
         ? COMMODITY_MAP_LAYERS
-        : FULL_MAP_LAYERS;
+        : SITE_VARIANT === 'uap'
+          ? UAP_MAP_LAYERS
+          : FULL_MAP_LAYERS;
 
 export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' 
   ? HAPPY_MOBILE_MAP_LAYERS 
@@ -832,7 +954,9 @@ export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy'
       ? FINANCE_MOBILE_MAP_LAYERS 
       : SITE_VARIANT === 'commodity'
         ? COMMODITY_MOBILE_MAP_LAYERS
-        : FULL_MOBILE_MAP_LAYERS;
+        : SITE_VARIANT === 'uap'
+          ? UAP_MOBILE_MAP_LAYERS
+          : FULL_MOBILE_MAP_LAYERS;
 
 /** Maps map-layer toggle keys to their data-freshness source IDs (single source of truth). */
 export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> = {
@@ -846,6 +970,8 @@ export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> =
   ucdpEvents: ['ucdp_events'],
   displacement: ['unhcr'],
   climate: ['climate'],
+  uapSightings: ['uap_sightings'],
+  uapHistoricalHotspots: ['uap_institutional'],
 };
 
 // ============================================
@@ -980,6 +1106,18 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
     labelKey: 'header.panelCatHappyPlanet',
     panelKeys: ['species', 'renewable', 'giving'],
     variants: ['happy'],
+  },
+
+  // UAP variant
+  uapIntel: {
+    labelKey: 'header.panelCatUapIntel',
+    panelKeys: ['intel', 'uap-news', 'uap-institutional', 'uap-investigative', 'uap-scientific', 'uap-legislative'],
+    variants: ['uap'],
+  },
+  uapSightings: {
+    labelKey: 'header.panelCatUapSightings',
+    panelKeys: ['uap-sightings', 'uap-aai', 'uap-sensors'],
+    variants: ['uap'],
   },
 };
 

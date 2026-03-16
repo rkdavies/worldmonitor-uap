@@ -312,6 +312,12 @@ export class EventHandlerManager implements AppModule {
           (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
         }
       }
+      if (e.key === STORAGE_KEYS.liveChannels + '-2' && e.newValue) {
+        const panel = this.ctx.panels['live-news-2'];
+        if (panel && typeof (panel as unknown as { refreshChannelsFromStorage?: () => void }).refreshChannelsFromStorage === 'function') {
+          (panel as unknown as { refreshChannelsFromStorage: () => void }).refreshChannelsFromStorage();
+        }
+      }
     };
     window.addEventListener('storage', this.boundStorageHandler);
 
