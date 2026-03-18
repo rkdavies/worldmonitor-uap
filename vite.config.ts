@@ -1,7 +1,9 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { resolve, dirname, extname } from 'path';
+import { existsSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
+import { fileURLToPath } from 'url';
 import { brotliCompress } from 'zlib';
 import { promisify } from 'util';
 import pkg from './package.json';
@@ -172,113 +174,177 @@ function sebufApiPlugin(): Plugin {
   let cachedRouter: Awaited<ReturnType<typeof buildRouter>> | null = null;
   let cachedCorsMod: any = null;
 
-  async function buildRouter() {
-    const [
-      routerMod, corsMod, errorMod,
-      seismologyServerMod, seismologyHandlerMod,
-      wildfireServerMod, wildfireHandlerMod,
-      climateServerMod, climateHandlerMod,
-      predictionServerMod, predictionHandlerMod,
-      displacementServerMod, displacementHandlerMod,
-      aviationServerMod, aviationHandlerMod,
-      researchServerMod, researchHandlerMod,
-      unrestServerMod, unrestHandlerMod,
-      conflictServerMod, conflictHandlerMod,
-      maritimeServerMod, maritimeHandlerMod,
-      cyberServerMod, cyberHandlerMod,
-      economicServerMod, economicHandlerMod,
-      infrastructureServerMod, infrastructureHandlerMod,
-      marketServerMod, marketHandlerMod,
-      newsServerMod, newsHandlerMod,
-      intelligenceServerMod, intelligenceHandlerMod,
-      militaryServerMod, militaryHandlerMod,
-      positiveEventsServerMod, positiveEventsHandlerMod,
-      givingServerMod, givingHandlerMod,
-      tradeServerMod, tradeHandlerMod,
-      supplyChainServerMod, supplyChainHandlerMod,
-      naturalServerMod, naturalHandlerMod,
-    ] = await Promise.all([
-        import('./server/router'),
-        import('./server/cors'),
-        import('./server/error-mapper'),
-        import('./src/generated/server/worldmonitor/seismology/v1/service_server'),
-        import('./server/worldmonitor/seismology/v1/handler'),
-        import('./src/generated/server/worldmonitor/wildfire/v1/service_server'),
-        import('./server/worldmonitor/wildfire/v1/handler'),
-        import('./src/generated/server/worldmonitor/climate/v1/service_server'),
-        import('./server/worldmonitor/climate/v1/handler'),
-        import('./src/generated/server/worldmonitor/prediction/v1/service_server'),
-        import('./server/worldmonitor/prediction/v1/handler'),
-        import('./src/generated/server/worldmonitor/displacement/v1/service_server'),
-        import('./server/worldmonitor/displacement/v1/handler'),
-        import('./src/generated/server/worldmonitor/aviation/v1/service_server'),
-        import('./server/worldmonitor/aviation/v1/handler'),
-        import('./src/generated/server/worldmonitor/research/v1/service_server'),
-        import('./server/worldmonitor/research/v1/handler'),
-        import('./src/generated/server/worldmonitor/unrest/v1/service_server'),
-        import('./server/worldmonitor/unrest/v1/handler'),
-        import('./src/generated/server/worldmonitor/conflict/v1/service_server'),
-        import('./server/worldmonitor/conflict/v1/handler'),
-        import('./src/generated/server/worldmonitor/maritime/v1/service_server'),
-        import('./server/worldmonitor/maritime/v1/handler'),
-        import('./src/generated/server/worldmonitor/cyber/v1/service_server'),
-        import('./server/worldmonitor/cyber/v1/handler'),
-        import('./src/generated/server/worldmonitor/economic/v1/service_server'),
-        import('./server/worldmonitor/economic/v1/handler'),
-        import('./src/generated/server/worldmonitor/infrastructure/v1/service_server'),
-        import('./server/worldmonitor/infrastructure/v1/handler'),
-        import('./src/generated/server/worldmonitor/market/v1/service_server'),
-        import('./server/worldmonitor/market/v1/handler'),
-        import('./src/generated/server/worldmonitor/news/v1/service_server'),
-        import('./server/worldmonitor/news/v1/handler'),
-        import('./src/generated/server/worldmonitor/intelligence/v1/service_server'),
-        import('./server/worldmonitor/intelligence/v1/handler'),
-        import('./src/generated/server/worldmonitor/military/v1/service_server'),
-        import('./server/worldmonitor/military/v1/handler'),
-        import('./src/generated/server/worldmonitor/positive_events/v1/service_server'),
-        import('./server/worldmonitor/positive-events/v1/handler'),
-        import('./src/generated/server/worldmonitor/giving/v1/service_server'),
-        import('./server/worldmonitor/giving/v1/handler'),
-        import('./src/generated/server/worldmonitor/trade/v1/service_server'),
-        import('./server/worldmonitor/trade/v1/handler'),
-        import('./src/generated/server/worldmonitor/supply_chain/v1/service_server'),
-        import('./server/worldmonitor/supply-chain/v1/handler'),
-        import('./src/generated/server/worldmonitor/natural/v1/service_server'),
-        import('./server/worldmonitor/natural/v1/handler'),
-      ]);
+  const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)));
+
+  /** Generated stubs are not in static imports so `vite` can start without `make generate`. */
+  async function buildRouter(viteServer: ViteDevServer) {
+    const [routerMod, corsMod, errorMod] = await Promise.all([
+      import('./server/router'),
+      import('./server/cors'),
+      import('./server/error-mapper'),
+    ]);
 
     const serverOptions = { onError: errorMod.mapErrorToResponse };
-    const allRoutes = [
-      ...seismologyServerMod.createSeismologyServiceRoutes(seismologyHandlerMod.seismologyHandler, serverOptions),
-      ...wildfireServerMod.createWildfireServiceRoutes(wildfireHandlerMod.wildfireHandler, serverOptions),
-      ...climateServerMod.createClimateServiceRoutes(climateHandlerMod.climateHandler, serverOptions),
-      ...predictionServerMod.createPredictionServiceRoutes(predictionHandlerMod.predictionHandler, serverOptions),
-      ...displacementServerMod.createDisplacementServiceRoutes(displacementHandlerMod.displacementHandler, serverOptions),
-      ...aviationServerMod.createAviationServiceRoutes(aviationHandlerMod.aviationHandler, serverOptions),
-      ...researchServerMod.createResearchServiceRoutes(researchHandlerMod.researchHandler, serverOptions),
-      ...unrestServerMod.createUnrestServiceRoutes(unrestHandlerMod.unrestHandler, serverOptions),
-      ...conflictServerMod.createConflictServiceRoutes(conflictHandlerMod.conflictHandler, serverOptions),
-      ...maritimeServerMod.createMaritimeServiceRoutes(maritimeHandlerMod.maritimeHandler, serverOptions),
-      ...cyberServerMod.createCyberServiceRoutes(cyberHandlerMod.cyberHandler, serverOptions),
-      ...economicServerMod.createEconomicServiceRoutes(economicHandlerMod.economicHandler, serverOptions),
-      ...infrastructureServerMod.createInfrastructureServiceRoutes(infrastructureHandlerMod.infrastructureHandler, serverOptions),
-      ...marketServerMod.createMarketServiceRoutes(marketHandlerMod.marketHandler, serverOptions),
-      ...newsServerMod.createNewsServiceRoutes(newsHandlerMod.newsHandler, serverOptions),
-      ...intelligenceServerMod.createIntelligenceServiceRoutes(intelligenceHandlerMod.intelligenceHandler, serverOptions),
-      ...militaryServerMod.createMilitaryServiceRoutes(militaryHandlerMod.militaryHandler, serverOptions),
-      ...positiveEventsServerMod.createPositiveEventsServiceRoutes(positiveEventsHandlerMod.positiveEventsHandler, serverOptions),
-      ...givingServerMod.createGivingServiceRoutes(givingHandlerMod.givingHandler, serverOptions),
-      ...tradeServerMod.createTradeServiceRoutes(tradeHandlerMod.tradeHandler, serverOptions),
-      ...supplyChainServerMod.createSupplyChainServiceRoutes(supplyChainHandlerMod.supplyChainHandler, serverOptions),
-      ...naturalServerMod.createNaturalServiceRoutes(naturalHandlerMod.naturalHandler, serverOptions),
-    ];
+    const allRoutes: unknown[] = [];
+    const missingGen: string[] = [];
+
+    async function addDomain(
+      genRel: string,
+      loadHandler: () => Promise<Record<string, unknown>>,
+      mount: (serverMod: Record<string, (...args: unknown[]) => unknown[]>, handlerMod: Record<string, unknown>) => unknown[],
+    ) {
+      const abs = resolve(projectRoot, genRel);
+      if (!existsSync(abs)) {
+        missingGen.push(genRel);
+        return;
+      }
+      const serverMod = (await viteServer.ssrLoadModule(abs)) as Record<string, (...args: unknown[]) => unknown[]>;
+      const handlerMod = await loadHandler();
+      allRoutes.push(...mount(serverMod, handlerMod));
+    }
+
+    await addDomain(
+      'src/generated/server/worldmonitor/seismology/v1/service_server.ts',
+      () => import('./server/worldmonitor/seismology/v1/handler'),
+      (s, h) => s.createSeismologyServiceRoutes(h.seismologyHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/wildfire/v1/service_server.ts',
+      () => import('./server/worldmonitor/wildfire/v1/handler'),
+      (s, h) => s.createWildfireServiceRoutes(h.wildfireHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/climate/v1/service_server.ts',
+      () => import('./server/worldmonitor/climate/v1/handler'),
+      (s, h) => s.createClimateServiceRoutes(h.climateHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/prediction/v1/service_server.ts',
+      () => import('./server/worldmonitor/prediction/v1/handler'),
+      (s, h) => s.createPredictionServiceRoutes(h.predictionHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/displacement/v1/service_server.ts',
+      () => import('./server/worldmonitor/displacement/v1/handler'),
+      (s, h) => s.createDisplacementServiceRoutes(h.displacementHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/aviation/v1/service_server.ts',
+      () => import('./server/worldmonitor/aviation/v1/handler'),
+      (s, h) => s.createAviationServiceRoutes(h.aviationHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/research/v1/service_server.ts',
+      () => import('./server/worldmonitor/research/v1/handler'),
+      (s, h) => s.createResearchServiceRoutes(h.researchHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/unrest/v1/service_server.ts',
+      () => import('./server/worldmonitor/unrest/v1/handler'),
+      (s, h) => s.createUnrestServiceRoutes(h.unrestHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/conflict/v1/service_server.ts',
+      () => import('./server/worldmonitor/conflict/v1/handler'),
+      (s, h) => s.createConflictServiceRoutes(h.conflictHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/maritime/v1/service_server.ts',
+      () => import('./server/worldmonitor/maritime/v1/handler'),
+      (s, h) => s.createMaritimeServiceRoutes(h.maritimeHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/cyber/v1/service_server.ts',
+      () => import('./server/worldmonitor/cyber/v1/handler'),
+      (s, h) => s.createCyberServiceRoutes(h.cyberHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/economic/v1/service_server.ts',
+      () => import('./server/worldmonitor/economic/v1/handler'),
+      (s, h) => s.createEconomicServiceRoutes(h.economicHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/infrastructure/v1/service_server.ts',
+      () => import('./server/worldmonitor/infrastructure/v1/handler'),
+      (s, h) => s.createInfrastructureServiceRoutes(h.infrastructureHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/market/v1/service_server.ts',
+      () => import('./server/worldmonitor/market/v1/handler'),
+      (s, h) => s.createMarketServiceRoutes(h.marketHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/news/v1/service_server.ts',
+      () => import('./server/worldmonitor/news/v1/handler'),
+      (s, h) => s.createNewsServiceRoutes(h.newsHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/intelligence/v1/service_server.ts',
+      () => import('./server/worldmonitor/intelligence/v1/handler'),
+      (s, h) => s.createIntelligenceServiceRoutes(h.intelligenceHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/military/v1/service_server.ts',
+      () => import('./server/worldmonitor/military/v1/handler'),
+      (s, h) => s.createMilitaryServiceRoutes(h.militaryHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/positive_events/v1/service_server.ts',
+      () => import('./server/worldmonitor/positive-events/v1/handler'),
+      (s, h) => s.createPositiveEventsServiceRoutes(h.positiveEventsHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/giving/v1/service_server.ts',
+      () => import('./server/worldmonitor/giving/v1/handler'),
+      (s, h) => s.createGivingServiceRoutes(h.givingHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/trade/v1/service_server.ts',
+      () => import('./server/worldmonitor/trade/v1/handler'),
+      (s, h) => s.createTradeServiceRoutes(h.tradeHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/supply_chain/v1/service_server.ts',
+      () => import('./server/worldmonitor/supply-chain/v1/handler'),
+      (s, h) => s.createSupplyChainServiceRoutes(h.supplyChainHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/natural/v1/service_server.ts',
+      () => import('./server/worldmonitor/natural/v1/handler'),
+      (s, h) => s.createNaturalServiceRoutes(h.naturalHandler, serverOptions),
+    );
+    await addDomain(
+      'src/generated/server/worldmonitor/uap/v1/service_server.ts',
+      () => import('./server/worldmonitor/uap/v1/handler'),
+      (s, h) => s.createUapServiceRoutes(h.uapHandler, serverOptions),
+    );
+
+    if (missingGen.length > 0) {
+      console.warn(
+        `\n\x1b[33m[sebuf-api]\x1b[0m ${missingGen.length} proto-generated server stubs missing (e.g. ${missingGen[0]}).\n` +
+          '  Vite dev server started, but local /api/* mirrors need: \x1b[1mcd proto && npx buf generate\x1b[0m\n',
+      );
+    }
+
     cachedCorsMod = corsMod;
-    return routerMod.createRouter(allRoutes);
+    return routerMod.createRouter(allRoutes as any);
   }
 
   return {
     name: 'sebuf-api',
     configureServer(server) {
+      // .env.local is not merged into process.env for API middleware by default — copy OpenSky into process.env for dev.
+      const envDir = server.config.envDir
+        ? resolve(server.config.envDir)
+        : resolve(dirname(fileURLToPath(import.meta.url)));
+      const fromFile = loadEnv(server.config.mode, envDir, '');
+      for (const key of ['OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET'] as const) {
+        const v = fromFile[key]?.trim();
+        if (v && !String(process.env[key] || '').trim()) {
+          process.env[key] = v;
+        }
+      }
+
       // Invalidate cached router on HMR updates to server/ files
       server.watcher.on('change', (file) => {
         if (file.includes('/server/') || file.includes('/src/generated/server/')) {
@@ -295,7 +361,7 @@ function sebufApiPlugin(): Plugin {
         try {
           // Build router once, reuse across requests (H-13 fix)
           if (!cachedRouter) {
-            cachedRouter = await buildRouter();
+            cachedRouter = await buildRouter(server);
           }
           const router = cachedRouter;
           const corsMod = cachedCorsMod;
@@ -529,8 +595,10 @@ function youtubeLivePlugin(): Plugin {
         }
 
         try {
-          const channelHandle = channel.startsWith('@') ? channel : `@${channel}`;
-          const liveUrl = `https://www.youtube.com/${channelHandle}/live`;
+          const trimmed = channel.trim();
+          const liveUrl = /^UC[a-zA-Z0-9_-]{22}$/.test(trimmed)
+            ? `https://www.youtube.com/channel/${trimmed}/live`
+            : `https://www.youtube.com/${trimmed.startsWith('@') ? trimmed : `@${trimmed}`}/live`;
 
           const ytRes = await fetch(liveUrl, {
             headers: {

@@ -79,8 +79,11 @@ export default async function handler(request) {
 
   // Fallback: direct scrape (limited from datacenter IPs)
   try {
-    const channelHandle = channel.startsWith('@') ? channel : `@${channel}`;
-    const response = await fetch(`https://www.youtube.com/${channelHandle}/live`, {
+    const trimmed = channel.trim();
+    const livePageUrl = /^UC[a-zA-Z0-9_-]{22}$/.test(trimmed)
+      ? `https://www.youtube.com/channel/${trimmed}/live`
+      : `https://www.youtube.com/${trimmed.startsWith('@') ? trimmed : `@${trimmed}`}/live`;
+    const response = await fetch(livePageUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
       redirect: 'follow',
     });

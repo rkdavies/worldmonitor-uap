@@ -19,6 +19,8 @@ message TrackAircraftRequest {
   double ne_lat = 5 [(sebuf.http.query) = { name: "ne_lat" }];
   // Optional bounding box north-east longitude.
   double ne_lon = 6 [(sebuf.http.query) = { name: "ne_lon" }];
+  // When true, return only ADS-B emitters classified as UAV (OpenSky category 14).
+  bool uav_emitters_only = 7 [(sebuf.http.query) = { name: "uav_only" }];
 }
 
 // TrackAircraftResponse contains aircraft position observations.

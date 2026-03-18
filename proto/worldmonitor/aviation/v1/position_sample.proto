@@ -40,4 +40,6 @@ message PositionSample {
   PositionSource source = 10;
   // Observation time as Unix epoch milliseconds.
   int64 observed_at = 11 [(sebuf.http.int64_encoding) = INT64_ENCODING_NUMBER];
+  // OpenSky ADS-B emitter category when extended=1 (e.g. 14 = UAV). 0 = unknown/not provided.
+  int32 emitter_category = 12;
 }

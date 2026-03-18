@@ -47,6 +47,9 @@ The codebase produces three app variants from the same source, each targeting a 
 | `full` | `npm run dev` | Geopolitics, military, conflicts, infrastructure |
 | `tech` | `npm run dev:tech` | Startups, AI/ML, cloud, cybersecurity |
 | `finance` | `npm run dev:finance` | Markets, trading, central banks, commodities |
+| `commodity` | `npm run dev:commodity` | Commodity supply chains |
+| `happy` | `npm run dev:happy` | Positive-news focus |
+| `uap` | `npm run dev:uap` | UAP situational awareness |
 
 Variants share all code but differ in default panels, map layers, and RSS feeds. Variant configs live in `src/config/variants/`.
 
@@ -100,14 +103,26 @@ npm run dev:finance
 npm run typecheck
 
 # Run tests
-npm run test:data          # Data integrity tests
-npm run test:e2e           # Playwright end-to-end tests
+npm run test:data          # Data integrity tests (includes panel/layer guardrails for all variants)
+npm run test:e2e           # Playwright: runtime + full + tech + finance + uap (each variant runs full e2e/)
+npm run test:e2e:uap       # Same as tech/finance: full e2e/ with VITE_VARIANT=uap
+npm run test:e2e:visual    # Golden map-harness screenshots: full + tech + uap
+npm run test:e2e:visual:update:uap  # Refresh UAP baselines (like visual:update:full)
+npm run test:e2e:theme-happy  # Happy-variant theme tests (requires happy build)
+
+# Verify every variant still compiles and bundles
+npm run verify:variants    # build:full, tech, finance, happy, commodity, uap
 
 # Production build (per variant)
-npm run build              # full
+npm run build              # full (+ blog)
 npm run build:tech
 npm run build:finance
+npm run build:happy
+npm run build:commodity
+npm run build:uap
 ```
+
+**Multi-variant smoke (manual):** after shared changes (`data-loader`, `Panel`, feeds), run `npm run verify:variants`, then spot-check `npm run dev:commodity`, `dev:happy`, and `dev:uap` (map loads, no console errors on first paint).
 
 The dev server runs at `http://localhost:3000`. Run `make help` to see all available make targets.
 

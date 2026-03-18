@@ -55,10 +55,16 @@ npm run dev:tech         # Start tech-only variant
 npm run typecheck        # tsc --noEmit (strict mode)
 npm run typecheck:api    # Typecheck API layer separately
 npm run test:data        # Run unit/integration tests
+npm run verify:variants  # Build all six web variants (catch tree-shaking / import errors)
 npm run test:sidecar     # Run sidecar + API handler tests
-npm run test:e2e         # Run all Playwright E2E tests
+npm run test:e2e         # Playwright: runtime + full + tech + finance + uap
+npm run test:e2e:uap     # Full e2e/ suite with VITE_VARIANT=uap (parity with test:e2e:tech)
+npm run test:e2e:visual:uap / test:e2e:visual:update:uap  # UAP map-harness goldens
 make generate            # Regenerate proto stubs (requires buf + sebuf plugins)
+npm run ingest:uap-observation-context  # OurAirports → UAP AAI airport proxy (network)
 ```
+
+**OpenSky (Flights / relay):** Production uses env or `WS_RELAY_URL`. Local: `credentials.json` (gitignored) or `.env.local` (gitignored). Run `npm run sync:opensky-env` to copy OpenSky keys from `credentials.json` into `.env.local`; Vite dev merges those into the API handler’s `process.env`. Relay still loads `credentials.json` when env is unset.
 
 ## Architecture Rules
 
@@ -93,6 +99,10 @@ types -> config -> services -> components -> app -> App.ts
 ```
 proto/ definitions -> buf generate -> src/generated/{client,server}/ -> handlers wire up
 ```
+
+After changing `proto/worldmonitor/aviation/v1/position_sample.proto` or `track_aircraft.proto`, run `make generate` so `PositionSample.emitter_category` and `TrackAircraftRequest.uav_emitters_only` appear in JSON responses.
+
+**Fresh clone / missing `src/generated/`:** Client + server stubs are **committed**. Run `npm run restore:generated` or `git checkout HEAD -- src/generated/client src/generated/server`. `npm run dev*` runs restore automatically. To regenerate after proto edits, use `make generate` (buf + sebuf plugins per [CONTRIBUTING](CONTRIBUTING.md)).
 
 - GET fields need `(sebuf.http.query)` annotation
 - `repeated string` fields need `parseStringArray()` in handler

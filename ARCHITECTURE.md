@@ -90,6 +90,8 @@ World Monitor is a real-time global intelligence dashboard built as a TypeScript
 
 All panels extend the `Panel` base class. Panels render via `setContent(html)` (debounced 150ms) and use event delegation on a stable `this.content` element. Panels support resizable row/col spans persisted to localStorage.
 
+**Live stream fullscreen stacking** — Live News / webcams use a CSS fullscreen mode (`body.live-news-fullscreen-active`, `.live-news-fullscreen`) rather than the browser Fullscreen API. The pinned map (`.map-section.pinned`, `z-index: 100`) sits above the default `.panels-grid` (`z-index: 1`), so on ultra-wide layouts `map-bottom-grid` panels (e.g. UAP News) could paint over the video. While fullscreen is active, `.panels-grid` is raised to `z-index: 101`, non-fullscreen panels in `map-bottom-grid` are hidden when a stream panel there is expanded, and `.map-resize-handle` (map vs. news strip) plus panel resize handles on the stream panel are hidden so they do not paint over the video. See `src/styles/main.css` and `tests/live-news-fullscreen-stacking.test.mjs`.
+
 ### Dual Map System
 
 - **DeckGLMap**: WebGL rendering via deck.gl + maplibre-gl. Supports ScatterplotLayer, GeoJsonLayer, PathLayer, IconLayer, PolygonLayer, ArcLayer, HeatmapLayer, H3HexagonLayer. PMTiles protocol for self-hosted basemap tiles. Supercluster for marker clustering.
