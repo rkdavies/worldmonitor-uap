@@ -135,6 +135,11 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/infrastructure/v1/list-temporal-anomalies': 'medium',
   '/api/webcam/v1/get-webcam-image': 'no-store',
   '/api/webcam/v1/list-webcams': 'no-store',
+
+  '/api/uap/v1/list-uap-sightings': 'slow',
+  '/api/uap/v1/get-aai-scores': 'medium',
+  '/api/uap/v1/list-uap-institutional-reports': 'slow',
+  '/api/uap/v1/list-uap-sensor-stations': 'medium',
 };
 
 const PREMIUM_RPC_PATHS = new Set([

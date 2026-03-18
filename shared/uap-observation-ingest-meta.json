@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-03-17T22:29:46.212Z",
+  "ourairports": {
+    "url": "https://davidmegginson.github.io/ourairports-data/airports.csv",
+    "types": [
+      "large_airport",
+      "medium_airport"
+    ],
+    "countsByRegion": {
+      "USA": 916,
+      "GBR": 89,
+      "Canada": 250,
+      "Australia": 193,
+      "Germany": 75,
+      "France": 135,
+      "Mexico": 71,
+      "Brazil": 138,
+      "Japan": 107,
+      "India": 138,
+      "Spain": 55,
+      "Italy": 73,
+      "Netherlands": 14,
+      "Belgium": 11,
+      "Sweden": 46,
+      "South Africa": 62,
+      "Argentina": 72,
+      "Chile": 33,
+      "New Zealand": 38,
+      "Ireland": 10,
+      "Portugal": 31,
+      "Poland": 27,
+      "Russia": 254,
+      "China": 328,
+      "Hungary": 10
+    }
+  }
+}

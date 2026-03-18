@@ -38,7 +38,9 @@ import type {
 } from '@/types';
 import { fetchMilitaryBases, type MilitaryBaseCluster as ServerBaseCluster } from '@/services/military-bases';
 import type { AirportDelayAlert, PositionSample } from '@/services/aviation';
-import { fetchAircraftPositions } from '@/services/aviation';
+import { fetchAircraftPositions, OPENSKY_UAV_ADSB_CATEGORY } from '@/services/aviation';
+import { dataFreshness } from '@/services/data-freshness';
+import { isMobileDevice } from '@/utils';
 import { type IranEvent, getIranEventColor, getIranEventRadius } from '@/services/conflict';
 import type { GpsJamHex } from '@/services/gps-interference';
 import { fetchImageryScenes } from '@/services/imagery';
@@ -91,6 +93,7 @@ import {
 import type { GulfInvestment } from '@/types';
 import { resolveTradeRouteSegments, TRADE_ROUTES as TRADE_ROUTES_LIST, type TradeRouteSegment } from '@/config/trade-routes';
 import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, UAP_LEGEND_ENTRIES, getUapShapeDotColor, getUapShapeLegendLabel, parseRgbToRgba, type MapVariant } from '@/config/map-layer-definitions';
+import { UAP_REPORTING_CONTEXT_POINTS } from '@/config/uap-observation-context';
 import { getSecretState } from '@/services/runtime-config';
 import { MapPopup, type PopupType } from './MapPopup';
 import {
@@ -327,6 +330,8 @@ export class DeckGLMap {
   private flightDelays: AirportDelayAlert[] = [];
   private aircraftPositions: PositionSample[] = [];
   private aircraftFetchTimer: ReturnType<typeof setInterval> | null = null;
+  /** UAP variant: filter map to OpenSky ADS-B UAV emitters only (category 14). */
+  private uavEmittersOnly = false;
   private news: NewsItem[] = [];
   private newsLocations: Array<{ lat: number; lon: number; title: string; threatLevel: string; timestamp?: Date }> = [];
   private newsLocationFirstSeen = new Map<string, number>();
@@ -438,6 +443,14 @@ export class DeckGLMap {
       layers: { ...initialState.layers },
     };
     this.hotspots = [...INTEL_HOTSPOTS];
+    try {
+      this.uavEmittersOnly =
+        SITE_VARIANT === 'uap' &&
+        typeof sessionStorage !== 'undefined' &&
+        sessionStorage.getItem('uapUavAdsbOnly') === '1';
+    } catch {
+      this.uavEmittersOnly = false;
+    }
 
     this.debouncedRebuildLayers = debounce(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
@@ -475,8 +488,11 @@ export class DeckGLMap {
     window.addEventListener('map-theme-changed', this.handleMapThemeChange);
 
     this.initMapLibre();
+    if (!this.maplibreMap) {
+      throw new Error('DeckGLMap: MapLibre basemap container unavailable');
+    }
 
-    this.maplibreMap?.on('load', () => {
+    this.maplibreMap.on('load', () => {
       localizeMapLabels(this.maplibreMap);
       this.rebuildTechHQSupercluster();
       this.rebuildDatacenterSupercluster();
@@ -1439,6 +1455,30 @@ export class DeckGLMap {
       layers.push(...this.createUapSightingsLayers());
     }
 
+    if (mapLayers.uapReportingContext && SITE_VARIANT === 'uap') {
+      layers.push(
+        new ScatterplotLayer<(typeof UAP_REPORTING_CONTEXT_POINTS)[0]>({
+          id: 'uap-reporting-context-layer',
+          data: UAP_REPORTING_CONTEXT_POINTS,
+          pickable: true,
+          opacity: 0.52,
+          stroked: true,
+          filled: true,
+          lineWidthMinPixels: 1,
+          getPosition: (d) => [d.lon, d.lat],
+          getRadius: (d) => 160_000 + (d.observationContextIndex / 100) * 240_000,
+          radiusUnits: 'meters',
+          getLineColor: [220, 240, 255, 90],
+          getFillColor: (d) => {
+            const x = d.observationContextIndex / 100;
+            return [Math.round(40 + x * 90), Math.round(160 - x * 60), Math.round(240 - x * 50), 125] as [
+              number, number, number, number,
+            ];
+          },
+        }),
+      );
+    }
+
     // Displacement flows arc layer
     if (mapLayers.displacement && this.displacementFlows.length > 0) {
       layers.push(this.createDisplacementArcsLayer());
@@ -1876,7 +1916,10 @@ export class DeckGLMap {
       getSize: (d) => d.onGround ? 14 : 18,
       getColor: (d) => {
         if (d.onGround) return [120, 120, 120, 160] as [number, number, number, number];
-        return [160, 100, 255, 220] as [number, number, number, number]; // Purple for all airborne
+        if (d.emitterCategory === OPENSKY_UAV_ADSB_CATEGORY) {
+          return [255, 140, 40, 235] as [number, number, number, number]; // UAV ADS-B (OpenSky cat 14)
+        }
+        return [160, 100, 255, 220] as [number, number, number, number];
       },
       getAngle: (d) => -d.trackDeg,
       sizeMinPixels: 8,
@@ -3290,6 +3333,13 @@ export class DeckGLMap {
       case 'uap-sightings-emoji-layer':
       case 'uap-sightings-dot-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${obj.shape ? text(obj.shape) : t('components.deckgl.layers.uapSightings')}</strong><br/>${text((obj.description ?? '').slice(0, 120))}${(obj.description?.length ?? 0) > 120 ? '…' : ''}</div>` };
+      case 'uap-reporting-context-layer': {
+        const sub = (obj.mapSubLabel as string | undefined)?.trim();
+        const place = sub ? `${text(obj.regionId)} (${text(sub)})` : text(obj.regionId);
+        return {
+          html: `<div class="deckgl-tooltip"><strong>${text(t('components.deckgl.layers.uapReportingContext'))}</strong><br/>${place} · ${t('components.uapAai.contextShort', { n: String(obj.observationContextIndex ?? 0) })}</div>`,
+        };
+      }
       case 'protest-clusters-layer':
         if (obj.count === 1) {
           const item = obj.items?.[0];
@@ -3954,6 +4004,29 @@ export class DeckGLMap {
     toggles.appendChild(authorBadge);
 
     this.container.appendChild(toggles);
+
+    if (SITE_VARIANT === 'uap') {
+      const uavRow = document.createElement('div');
+      uavRow.className = 'layer-uav-adsb-filter';
+      uavRow.innerHTML = `
+        <label class="layer-uav-adsb-filter__label">
+          <input type="checkbox" class="layer-uav-adsb-filter__cb" ${this.uavEmittersOnly ? 'checked' : ''} />
+          <span>${t('components.deckgl.uavAdsbFilter')}</span>
+        </label>
+        <div class="layer-uav-adsb-filter__hint">${t('components.deckgl.uavAdsbFilterHint')}</div>
+      `;
+      const cb = uavRow.querySelector('.layer-uav-adsb-filter__cb') as HTMLInputElement | null;
+      cb?.addEventListener('change', () => {
+        this.uavEmittersOnly = !!cb.checked;
+        try {
+          sessionStorage.setItem('uapUavAdsbOnly', cb.checked ? '1' : '0');
+        } catch { /* private mode */ }
+        this.lastAircraftFetchCenter = null;
+        if (this.state.layers.flights) this.fetchViewportAircraft();
+        this.render();
+      });
+      toggles.insertBefore(uavRow, authorBadge);
+    }
 
     // Bind toggle events
     toggles.querySelectorAll('.layer-toggle input').forEach(input => {
@@ -4755,6 +4828,7 @@ export class DeckGLMap {
 
   private fetchServerBases(): void {
     if (!this.maplibreMap) return;
+    if (import.meta.env.VITE_E2E === '1') return;
     const mapLayers = this.state.layers;
     if (!mapLayers.bases) return;
     const zoom = this.maplibreMap.getZoom();
@@ -4773,15 +4847,22 @@ export class DeckGLMap {
     });
   }
 
+  private aircraftPollIntervalMs(): number {
+    if (SITE_VARIANT === 'uap' && isMobileDevice()) return 180_000;
+    return 120_000;
+  }
+
   private manageAircraftTimer(enabled: boolean): void {
     if (enabled) {
-      if (!this.aircraftFetchTimer) {
-        this.aircraftFetchTimer = setInterval(() => {
-          this.lastAircraftFetchCenter = null; // force refresh on poll
-          this.fetchViewportAircraft();
-        }, 120_000); // Match server cache TTL (120s anonymous OpenSky tier)
-        this.debouncedFetchAircraft();
+      if (this.aircraftFetchTimer) {
+        clearInterval(this.aircraftFetchTimer);
+        this.aircraftFetchTimer = null;
       }
+      this.aircraftFetchTimer = setInterval(() => {
+        this.lastAircraftFetchCenter = null;
+        this.fetchViewportAircraft();
+      }, this.aircraftPollIntervalMs());
+      this.debouncedFetchAircraft();
     } else {
       if (this.aircraftFetchTimer) {
         clearInterval(this.aircraftFetchTimer);
@@ -4822,9 +4903,11 @@ export class DeckGLMap {
     fetchAircraftPositions({
       swLat: sw.lat, swLon: sw.lng,
       neLat: ne.lat, neLon: ne.lng,
+      uavOnly: this.uavEmittersOnly,
     }).then((positions) => {
       if (seq !== this.aircraftFetchSeq) return; // discard stale response
       this.aircraftPositions = positions;
+      dataFreshness.recordUpdate('opensky_traffic', positions.length);
       this.onAircraftPositionsUpdate?.(positions);
       const center = this.maplibreMap?.getCenter();
       if (center) {
@@ -4834,6 +4917,7 @@ export class DeckGLMap {
       this.render();
     }).catch((err) => {
       console.error('[aircraft] fetch error', err);
+      dataFreshness.recordError('opensky_traffic', String(err));
     });
   }
 

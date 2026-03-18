@@ -140,6 +140,7 @@ const layers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 await initI18n();

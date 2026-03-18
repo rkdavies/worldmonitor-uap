@@ -27,8 +27,8 @@ function customChannelIdFromHandle(handle: string): string {
   return 'custom-' + normalized;
 }
 
-/** Parse YouTube URL into a handle or video ID. Returns null if not a YouTube URL. */
-function parseYouTubeInput(raw: string): { handle: string } | { videoId: string } | null {
+/** Parse YouTube URL into a handle, channel ID, or video ID. */
+function parseYouTubeInput(raw: string): { handle: string } | { videoId: string } | { channelId: string } | null {
   let url: URL;
   try {
     url = new URL(raw);
@@ -46,13 +46,16 @@ function parseYouTubeInput(raw: string): { handle: string } | { videoId: string 
   // youtube.com/watch?v=VIDEO_ID
   const v = url.searchParams.get('v');
   if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return { videoId: v };
+  // youtube.com/channel/UC…
+  const ucMatch = url.pathname.match(/^\/channel\/(UC[a-zA-Z0-9_-]{22})\/?$/);
+  if (ucMatch?.[1]) return { channelId: ucMatch[1] };
   // youtube.com/@Handle
   const handleMatch = url.pathname.match(/^\/@([\w.-]{3,30})$/);
   if (handleMatch) return { handle: `@${handleMatch[1]}` };
-  // youtube.com/c/ChannelName or /channel/ID
-  const channelMatch = url.pathname.match(/^\/(c|channel)\/([\w.-]+)$/);
-  if (channelMatch) return { handle: `@${channelMatch[2]}` };
-  // youtube.com/ChannelName (bare path, no @/c/channel prefix)
+  // youtube.com/c/vanity (not UC channel IDs)
+  const cMatch = url.pathname.match(/^\/c\/([\w.-]+)$/);
+  if (cMatch) return { handle: `@${cMatch[1]}` };
+  // youtube.com/ChannelName (bare path)
   const bareMatch = url.pathname.match(/^\/([\w.-]{3,30})$/);
   if (bareMatch) return { handle: `@${bareMatch[1]}` };
 
@@ -243,12 +246,21 @@ export async function initLiveChannelsWindow(
     if (isCustom) {
       const handleRaw = (formRow.querySelector('.live-news-manage-edit-handle') as HTMLInputElement | null)?.value?.trim();
       if (handleRaw) {
+        const uc = /^UC[a-zA-Z0-9_-]{22}$/.test(handleRaw) ? handleRaw : null;
+        if (uc) {
+          const newId = `custom-${uc}`;
+          const existing = channels.find((c) => c.id === newId && c.id !== currentCh.id);
+          if (existing) return null;
+          const next = channels.slice();
+          next[idx] = { ...currentCh, id: newId, channelId: uc, handle: undefined, name: displayName };
+          return next;
+        }
         const handle = handleRaw.startsWith('@') ? handleRaw : `@${handleRaw}`;
         const newId = customChannelIdFromHandle(handle);
         const existing = channels.find((c) => c.id === newId && c.id !== currentCh.id);
         if (existing) return null;
         const next = channels.slice();
-        next[idx] = { ...currentCh, id: newId, handle, name: displayName };
+        next[idx] = { ...currentCh, id: newId, handle, channelId: undefined, name: displayName };
         return next;
       }
     }
@@ -266,7 +278,7 @@ export async function initLiveChannelsWindow(
       const handleInput = document.createElement('input');
       handleInput.type = 'text';
       handleInput.className = 'live-news-manage-edit-handle';
-      handleInput.value = ch.handle ?? '';
+      handleInput.value = ch.channelId ?? ch.handle ?? '';
       handleInput.placeholder = t('components.liveNews.youtubeHandle') ?? 'YouTube handle';
       row.appendChild(handleInput);
     }
@@ -294,7 +306,7 @@ export async function initLiveChannelsWindow(
     saveBtn.className = 'live-news-manage-save';
     saveBtn.textContent = t('components.liveNews.save') ?? 'Save';
     saveBtn.addEventListener('click', () => {
-      const displayName = nameInput.value.trim() || ch.name || ch.handle || '';
+      const displayName = nameInput.value.trim() || ch.name || ch.handle || ch.channelId || '';
       const next = applyEditFormToChannels(ch, row, isCustom, displayName);
       if (next) {
         channels = next;
@@ -330,14 +342,14 @@ export async function initLiveChannelsWindow(
         if (r.key !== activeRegionTab) return false;
         return r.channelIds.some(id => {
           const ch = optionalChannelMap.get(id);
-          return ch && (ch.name.toLowerCase().includes(term) || ch.handle?.toLowerCase().includes(term));
+          return ch && (ch.name.toLowerCase().includes(term) || ch.handle?.toLowerCase().includes(term) || ch.channelId?.toLowerCase().includes(term));
         });
       });
       if (!activeHasMatch) {
         const firstMatch = filteredRegions.find(r =>
           r.channelIds.some(id => {
             const ch = optionalChannelMap.get(id);
-            return ch && (ch.name.toLowerCase().includes(term) || ch.handle?.toLowerCase().includes(term));
+            return ch && (ch.name.toLowerCase().includes(term) || ch.handle?.toLowerCase().includes(term) || ch.channelId?.toLowerCase().includes(term));
           }),
         );
         if (firstMatch) activeRegionTab = firstMatch.key;
@@ -352,7 +364,7 @@ export async function initLiveChannelsWindow(
         .filter((ch): ch is LiveChannel => !!ch);
 
       const matchingChannels = term
-        ? regionChannels.filter(ch => ch.name.toLowerCase().includes(term) || ch.handle?.toLowerCase().includes(term))
+        ? regionChannels.filter(ch => ch.name.toLowerCase().includes(term) || ch.handle?.toLowerCase().includes(term) || ch.channelId?.toLowerCase().includes(term))
         : regionChannels;
 
       const addedCount = matchingChannels.filter(ch => currentIds.has(ch.id)).length;
@@ -384,7 +396,7 @@ export async function initLiveChannelsWindow(
       for (const chId of region.channelIds) {
         const ch = optionalChannelMap.get(chId);
         if (!ch) continue;
-        if (term && !ch.name.toLowerCase().includes(term) && !ch.handle?.toLowerCase().includes(term)) continue;
+        if (term && !ch.name.toLowerCase().includes(term) && !ch.handle?.toLowerCase().includes(term) && !ch.channelId?.toLowerCase().includes(term)) continue;
         const isAdded = currentIds.has(chId);
         grid.appendChild(createCard(ch, isAdded, listEl));
         matchCount++;
@@ -417,7 +429,7 @@ export async function initLiveChannelsWindow(
     nameEl.textContent = ch.name;
     const handleEl = document.createElement('span');
     handleEl.className = 'live-news-manage-card-handle';
-    handleEl.textContent = ch.handle ?? '';
+    handleEl.textContent = ch.handle ?? ch.channelId ?? '';
     info.appendChild(nameEl);
     info.appendChild(handleEl);
 
@@ -559,6 +571,46 @@ export async function initLiveChannelsWindow(
 
     // Try parsing as a YouTube URL first
     const parsed = parseYouTubeInput(raw);
+
+    async function pushChannelId(channelId: string): Promise<void> {
+      const id = `custom-${channelId}`;
+      if (channels.some((c) => c.id === id)) return;
+      if (addBtn) {
+        addBtn.disabled = true;
+        addBtn.textContent = t('components.liveNews.verifying') ?? 'Verifying…';
+      }
+      let resolvedName = nameInput?.value?.trim() || '';
+      if (!resolvedName) {
+        try {
+          const res = await fetch(toApiUrl(`/api/youtube/live?channel=${encodeURIComponent(channelId)}`));
+          if (res.ok) {
+            const data = await res.json();
+            resolvedName = data.channelName || '';
+          }
+        } catch { /* ignore */ }
+      }
+      if (!resolvedName) resolvedName = channelId;
+      if (addBtn) {
+        addBtn.disabled = false;
+        addBtn.textContent = t('components.liveNews.addChannel') ?? 'Add channel';
+      }
+      channels.push({ id, name: resolvedName, channelId });
+      saveChannelsToStorage(channels, storageSuffix);
+      if (listEl) renderList(listEl);
+      if (handleInput) handleInput.value = '';
+      if (hlsInput) hlsInput.value = '';
+      if (nameInput) nameInput.value = '';
+    }
+
+    if (parsed && 'channelId' in parsed) {
+      await pushChannelId(parsed.channelId);
+      return;
+    }
+
+    if (/^UC[a-zA-Z0-9_-]{22}$/.test(raw)) {
+      await pushChannelId(raw);
+      return;
+    }
 
     // Direct video URL (watch?v= or youtu.be/)
     if (parsed && 'videoId' in parsed) {

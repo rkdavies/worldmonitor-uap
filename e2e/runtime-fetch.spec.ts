@@ -376,9 +376,9 @@ test.describe('desktop runtime routing guardrails', () => {
       }
     });
 
-    expect(result.macArm).toBe('https://worldmonitor.app/api/download?platform=macos-arm64&variant=full');
-    expect(result.windowsX64).toBe('https://worldmonitor.app/api/download?platform=windows-exe&variant=full');
-    expect(result.linuxFallback).toBe('https://github.com/koala73/worldmonitor/releases/latest');
+    expect(result.macArm).toBe('https://api.worldmonitor.app/api/download?platform=macos-arm64&variant=full');
+    expect(result.windowsX64).toBe('https://api.worldmonitor.app/api/download?platform=windows-msi&variant=full');
+    expect(result.linuxFallback).toBe('https://api.worldmonitor.app/api/download?platform=linux-appimage&variant=full');
   });
 
   test('MapContainer falls back to SVG when WebGL2 is unavailable', async ({ page }) => {
@@ -562,10 +562,10 @@ test.describe('desktop runtime routing guardrails', () => {
         calls.push(url);
         const parsed = new URL(url);
 
-        // Sebuf proto: POST /api/market/v1/list-market-quotes
+        // Sebuf: GET /api/market/v1/list-market-quotes?symbols=...
         if (parsed.pathname === '/api/market/v1/list-market-quotes') {
-          const body = init?.body ? JSON.parse(String(init.body)) : {};
-          const symbols: string[] = body.symbols || [];
+          const raw = parsed.searchParams.get('symbols') ?? '';
+          const symbols: string[] = raw.split(',').map((s) => s.trim()).filter(Boolean);
           const quotes = symbols
             .filter((s: string) => yahooOnly.has(s))
             .map((s: string) => {
@@ -686,9 +686,11 @@ test.describe('desktop runtime routing guardrails', () => {
 
       window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const parsed = new URL(toUrl(input));
+        if (parsed.pathname === '/api/conflict/v1/get-humanitarian-summary-batch') {
+          return new Response('{}', { status: 404 });
+        }
         if (parsed.pathname === '/api/conflict/v1/get-humanitarian-summary') {
-          const body = init?.body ? JSON.parse(String(init.body)) : {};
-          const countryCode = String(body.countryCode || '').toUpperCase();
+          const countryCode = String(parsed.searchParams.get('country_code') || '').toUpperCase();
           seenCountryCodes.add(countryCode);
           return responseJson({
             summary: {

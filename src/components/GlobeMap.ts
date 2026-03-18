@@ -21,8 +21,9 @@ import { INTEL_HOTSPOTS, CONFLICT_ZONES, MILITARY_BASES, NUCLEAR_FACILITIES, SPA
 import { PIPELINES } from '@/config/pipelines';
 import { t } from '@/services/i18n';
 import { SITE_VARIANT } from '@/config/variant';
+import { UAP_REPORTING_CONTEXT_POINTS } from '@/config/uap-observation-context';
 import { getGlobeRenderScale, resolveGlobePixelRatio, resolvePerformanceProfile, subscribeGlobeRenderScaleChange, getGlobeTexture, GLOBE_TEXTURE_URLS, subscribeGlobeTextureChange, getGlobeVisualPreset, subscribeGlobeVisualPresetChange, type GlobeRenderScale, type GlobePerformanceProfile, type GlobeVisualPreset } from '@/services/globe-render-settings';
-import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, getUapShapeDotColor, type MapVariant } from '@/config/map-layer-definitions';
+import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, getUapShapeDotColor, UAP_LEGEND_ENTRIES, getUapShapeLegendLabel, type MapVariant } from '@/config/map-layer-definitions';
 import { getSecretState } from '@/services/runtime-config';
 import { resolveTradeRouteSegments, type TradeRouteSegment } from '@/config/trade-routes';
 import { GAMMA_IRRADIATORS } from '@/config/irradiators';
@@ -160,6 +161,13 @@ interface UapSightingMarker extends BaseMarker {
   shape: string;
   /** Unix seconds (occurred) for time-range filter */
   timestamp?: number;
+}
+interface UapReportingContextMarker extends BaseMarker {
+  _kind: 'uapReportingContext';
+  id: string;
+  regionId: string;
+  observationContextIndex: number;
+  mapSubLabel?: string;
 }
 interface UcdpMarker extends BaseMarker {
   _kind: 'ucdp';
@@ -387,6 +395,7 @@ type GlobeMarker =
   | WeatherMarker | NaturalMarker | IranMarker | OutageMarker
   | CyberMarker | FireMarker | ProtestMarker
   | UapSightingMarker
+  | UapReportingContextMarker
   | UcdpMarker | DisplacementMarker | ClimateMarker | GpsJamMarker | TechMarker
   | ConflictZoneMarker | MilBaseMarker | NuclearSiteMarker | IrradiatorSiteMarker | SpaceportSiteMarker
   | EarthquakeMarker | EconomicMarker | DatacenterMarker | WaterwayMarker | MineralMarker
@@ -510,12 +519,16 @@ export class GlobeMap {
 
   // Overlay UI elements
   private layerTogglesEl: HTMLElement | null = null;
+  /** UAP variant: bottom legend + click-to-filter (parity with DeckGLMap). */
+  private uapLegendEl: HTMLElement | null = null;
+  private selectedUapLegendShape: string | null = null;
   private tooltipEl: HTMLElement | null = null;
   private tooltipHideTimer: ReturnType<typeof setTimeout> | null = null;
   private satHoverStyle: HTMLStyleElement | null = null;
 
   // Callbacks
   private onLayerChangeCb: ((layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void) | null = null;
+  private onTimeRangeChangeCb: ((range: TimeRange) => void) | null = null;
   private onMapContextMenuCb?: (payload: { lat: number; lon: number; screenX: number; screenY: number }) => void;
   private readonly handleContextMenu = (e: MouseEvent): void => {
     e.preventDefault();
@@ -852,9 +865,12 @@ export class GlobeMap {
     this.applyRenderQuality(initialScale);
     this.applyPerformanceProfile(resolvePerformanceProfile(initialScale));
 
-    // Add overlay UI (zoom controls + layer panel)
+    // Add overlay UI (zoom + time range + layer panel) — parity with DeckGLMap
     this.createControls();
+    this.createTimeSlider();
     this.createLayerToggles();
+
+    if (SITE_VARIANT === 'uap') this.createUapLegend();
 
     // Load static datasets
     this.setHotspots(INTEL_HOTSPOTS);
@@ -1020,6 +1036,12 @@ export class GlobeMap {
       const uapColor = getUapShapeDotColor(d.shape);
       el.innerHTML = GlobeMap.wrapHit(`<div style="width:10px;height:10px;border-radius:50%;background:${uapColor};box-shadow:0 0 4px ${uapColor}88;"></div>`);
       el.title = d.shape ? `${d.shape}: ${d.description.slice(0, 80)}` : d.description.slice(0, 80);
+    } else if (d._kind === 'uapReportingContext') {
+      const t = d.observationContextIndex / 100;
+      const c = `rgb(${Math.round(50 + t * 80)},${Math.round(160 - t * 50)},${Math.round(220 - t * 40)})`;
+      el.innerHTML = GlobeMap.wrapHit(`<div style="width:${8 + t * 8}px;height:${8 + t * 8}px;border-radius:50%;background:${c};border:1px solid rgba(255,255,255,0.5);"></div>`);
+      const sub = d.mapSubLabel ? ` · ${d.mapSubLabel}` : '';
+      el.title = `${d.regionId}${sub}: context ${d.observationContextIndex}`;
     } else if (d._kind === 'ucdp') {
       const size = Math.min(10, 5 + (d.deaths || 0) * 0.3);
       el.innerHTML = GlobeMap.wrapHit(`
@@ -1323,6 +1345,11 @@ export class GlobeMap {
       html = `<span style="color:${uapColor};font-weight:bold;">🛸 UAP</span>` +
              (d.shape ? `<br><span style="opacity:.7;">${esc(d.shape)}</span>` : '') +
              `<br><span style="opacity:.7;white-space:normal;display:block;">${esc(d.description.slice(0, 120))}</span>`;
+    } else if (d._kind === 'uapReportingContext') {
+      const sub = d.mapSubLabel ? ` · ${esc(d.mapSubLabel)}` : '';
+      html = `<span style="color:#66ccff;font-weight:bold;">🌤 Reporting context</span>` +
+             `<br><span style="opacity:.7;">${esc(d.regionId)}${sub}</span>` +
+             `<br><span style="opacity:.5;">Index ${d.observationContextIndex}/100 (national proxy)</span>`;
     } else if (d._kind === 'ucdp') {
       html = `<span style="color:#ff6400;font-weight:bold;">⚔ ${esc(d.country)}</span>` +
              `<br><span style="opacity:.7;">${esc(d.sideA)} vs ${esc(d.sideB)}</span>` +
@@ -1672,6 +1699,37 @@ export class GlobeMap {
     });
   }
 
+  private createTimeSlider(): void {
+    const slider = document.createElement('div');
+    slider.className = 'time-slider deckgl-time-slider';
+    slider.innerHTML = `
+      <div class="time-options">
+        <button class="time-btn ${this.timeRange === '1d' ? 'active' : ''}" data-range="1d">1d</button>
+        <button class="time-btn ${this.timeRange === '7d' ? 'active' : ''}" data-range="7d">7d</button>
+        <button class="time-btn ${this.timeRange === '30d' ? 'active' : ''}" data-range="30d">30d</button>
+        <button class="time-btn ${this.timeRange === '6m' ? 'active' : ''}" data-range="6m">6m</button>
+        <button class="time-btn ${this.timeRange === '1y' ? 'active' : ''}" data-range="1y">1y</button>
+        <button class="time-btn ${this.timeRange === 'all' ? 'active' : ''}" data-range="all">${t('components.deckgl.timeAll')}</button>
+      </div>
+    `;
+    this.container.appendChild(slider);
+    slider.querySelectorAll('.time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const range = (btn as HTMLElement).dataset.range as TimeRange;
+        this.setTimeRange(range);
+      });
+    });
+  }
+
+  private updateTimeSliderButtons(): void {
+    const slider = this.container.querySelector('.deckgl-time-slider');
+    if (!slider) return;
+    slider.querySelectorAll('.time-btn').forEach(btn => {
+      const range = (btn as HTMLElement).dataset.range as TimeRange | undefined;
+      btn.classList.toggle('active', range === this.timeRange);
+    });
+  }
+
   private zoomInGlobe(): void {
     if (!this.globe) return;
     const pov = this.globe.pointOfView();
@@ -1700,8 +1758,7 @@ export class GlobeMap {
 
     const el = document.createElement('div');
     el.className = 'layer-toggles deckgl-layer-toggles';
-    el.style.bottom = 'auto';
-    el.style.top = '10px';
+    /* Match 2D deck.gl: bottom-left. (Previous top:10px hid bottom legend overlap intent but broke UX vs 2D.) */
     el.innerHTML = `
       <div class="toggle-header">
         <span>${t('components.deckgl.layersTitle')}</span>
@@ -1735,6 +1792,7 @@ export class GlobeMap {
           this.flushLayerChannels(layer);
           this.onLayerChangeCb?.(layer, checked, 'user');
           this.enforceLayerLimit();
+          if (layer === 'uapSightings' && SITE_VARIANT === 'uap') this.refreshUapLegendDom();
           // Show/hide webcam marker-mode sub-row when webcam layer is toggled
           if (layer === 'webcams') {
             const modeRow = el.querySelector('.webcam-mode-row') as HTMLElement | null;
@@ -1854,7 +1912,20 @@ export class GlobeMap {
     if (this.layers.cyberThreats) markers.push(...this.cyberMarkers);
     if (this.layers.fires) markers.push(...this.fireMarkers);
     if (this.layers.protests) markers.push(...this.protestMarkers);
-    if (this.layers.uapSightings) markers.push(...this.getFilteredUapSightingMarkers());
+    if (this.layers.uapSightings) markers.push(...this.getUapMarkersForGlobe());
+    if (this.layers.uapReportingContext && SITE_VARIANT === 'uap') {
+      for (const p of UAP_REPORTING_CONTEXT_POINTS) {
+        markers.push({
+          _kind: 'uapReportingContext',
+          _lat: p.lat,
+          _lng: p.lon,
+          id: `uap-ctx-${p.mapPointId}`,
+          regionId: p.regionId,
+          observationContextIndex: p.observationContextIndex,
+          mapSubLabel: p.mapSubLabel,
+        });
+      }
+    }
     if (this.layers.ucdpEvents) markers.push(...this.ucdpMarkers);
     if (this.layers.displacement) markers.push(...this.displacementMarkers);
     if (this.layers.climate) markers.push(...this.climateMarkers);
@@ -2317,7 +2388,8 @@ export class GlobeMap {
 
   public setLayers(layers: MapLayers): void {
     const prev = this.layers;
-    this.layers = { ...layers };
+    this.layers = { ...layers, dayNight: false };
+    this.hideLayerToggle('dayNight');
     let needMarkers = false, needArcs = false, needPaths = false, needPolygons = false;
     for (const k of Object.keys(layers) as (keyof MapLayers)[]) {
       if (prev[k] === layers[k]) continue;
@@ -2453,6 +2525,9 @@ export class GlobeMap {
 
   public setTimeRange(range: TimeRange): void {
     this.timeRange = range;
+    this.updateTimeSliderButtons();
+    this.onTimeRangeChangeCb?.(range);
+    if (SITE_VARIANT === 'uap') this.refreshUapLegendDom();
     this.flushMarkers();
   }
 
@@ -2480,6 +2555,59 @@ export class GlobeMap {
       if (m.timestamp == null) return true;
       return m.timestamp * 1000 >= cutoffMs;
     });
+  }
+
+  private getUapMarkersForGlobe(): UapSightingMarker[] {
+    let list = this.getFilteredUapSightingMarkers();
+    if (SITE_VARIANT === 'uap' && this.selectedUapLegendShape) {
+      list = list.filter((m) => getUapShapeLegendLabel(m.shape) === this.selectedUapLegendShape);
+    }
+    return list;
+  }
+
+  private createUapLegend(): void {
+    if (SITE_VARIANT !== 'uap') return;
+    const legend = document.createElement('div');
+    legend.className = 'map-legend deckgl-legend globe-uap-legend';
+    legend.style.zIndex = '101';
+    this.container.appendChild(legend);
+    this.uapLegendEl = legend;
+    legend.addEventListener('click', (e: MouseEvent) => {
+      const item = (e.target as HTMLElement).closest('.legend-item[data-uap-shape]');
+      if (!item) return;
+      const shape = item.getAttribute('data-uap-shape');
+      if (shape == null) return;
+      this.selectedUapLegendShape = this.selectedUapLegendShape === shape ? null : shape;
+      this.refreshUapLegendDom();
+      this.flushMarkers();
+    });
+    this.refreshUapLegendDom();
+  }
+
+  private refreshUapLegendDom(): void {
+    if (!this.uapLegendEl || SITE_VARIANT !== 'uap') return;
+    const shapes = {
+      circle: (color: string) => `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="${color}"/></svg>`,
+    };
+    const filtered = this.getFilteredUapSightingMarkers();
+    const labelsPresent = new Set<string>();
+    for (const m of filtered) {
+      const label = getUapShapeLegendLabel(m.shape);
+      if (label) labelsPresent.add(label);
+    }
+    const legendItems = UAP_LEGEND_ENTRIES
+      .filter((e) => labelsPresent.has(e.label))
+      .map(({ label, dotColor }) => ({ shape: shapes.circle(dotColor), label }));
+    const title = t('components.deckgl.legend.title');
+    this.uapLegendEl.innerHTML = `
+      <span class="legend-label-title">${title}</span>
+      ${legendItems.map(({ shape, label }) => {
+        const active = this.selectedUapLegendShape === label;
+        return `<span class="legend-item legend-item--clickable${active ? ' legend-item--active' : ''}" data-uap-shape="${escapeHtml(label)}" role="button">${shape}<span class="legend-label">${escapeHtml(label)}</span></span>`;
+      }).join('')}
+    `;
+    const show = this.layers.uapSightings && legendItems.length > 0;
+    this.uapLegendEl.style.display = show ? 'flex' : 'none';
   }
 
   // ─── Callback setters ─────────────────────────────────────────────────────
@@ -2550,7 +2678,9 @@ export class GlobeMap {
   public setOnLayerChange(cb: (layer: keyof MapLayers, enabled: boolean, source: 'user' | 'programmatic') => void): void {
     this.onLayerChangeCb = cb;
   }
-  public setOnTimeRangeChange(_cb: any): void {}
+  public setOnTimeRangeChange(cb: (range: TimeRange) => void): void {
+    this.onTimeRangeChangeCb = cb;
+  }
   public hideLayerToggle(layer: keyof MapLayers): void {
     this.layerTogglesEl?.querySelector(`.layer-toggle[data-layer="${layer}"]`)?.remove();
   }
@@ -2757,6 +2887,7 @@ export class GlobeMap {
       shape: s.shape ?? '',
       timestamp: s.timestamp,
     }));
+    if (SITE_VARIANT === 'uap') this.refreshUapLegendDom();
     this.flushMarkers();
   }
   public setFlightDelays(delays: AirportDelayAlert[]): void {
@@ -3064,7 +3195,9 @@ export class GlobeMap {
     this.flushMarkers();
   }
   public onHotspotClicked(cb: (h: Hotspot) => void): void { this.onHotspotClickCb = cb; }
-  public onTimeRangeChanged(_cb: (r: TimeRange) => void): void {}
+  public onTimeRangeChanged(cb: (r: TimeRange) => void): void {
+    this.onTimeRangeChangeCb = cb;
+  }
   public onStateChanged(_cb: (s: MapContainerState) => void): void {}
   public setOnCountry(_cb: any): void {}
   public getHotspotLevel(_id: string) { return 'low'; }

@@ -2,6 +2,7 @@ import type { CountryBriefSignals } from '@/types';
 import type { CountryScore } from '@/services/country-instability';
 import type { PredictionMarket } from '@/services/prediction';
 import type { NewsItem } from '@/types';
+import type { AaiScore } from '@/generated/client/worldmonitor/uap/v1/service_client';
 
 export interface CountryIntelData {
   brief: string;
@@ -80,7 +81,7 @@ export interface CountryFactsData {
 }
 
 export interface CountryBriefPanel {
-  show(country: string, code: string, score: CountryScore | null, signals: CountryBriefSignals): void;
+  show(country: string, code: string, score: CountryScore | null, signals: CountryBriefSignals, aaiScore?: AaiScore | null): void;
   hide(): void;
   showLoading(): void;
   getCode(): string | null;
@@ -100,6 +101,10 @@ export interface CountryBriefPanel {
   updateScore?(score: CountryScore | null, signals: CountryBriefSignals): void;
   updateSignalDetails?(details: CountryDeepDiveSignalDetails): void;
   updateMilitaryActivity?(summary: CountryDeepDiveMilitarySummary): void;
+  updateSensorCoverage?(nearby: { name: string; distanceKm: number }[]): void;
+  updateSightingShapes?(shapeCounts: Record<string, number>): void;
+  updateRecentSightings?(sightings: Array<{ timestamp: number; shape: string; description?: string }>): void;
+  updateInstitutionalActivity?(institutionalActivity: number): void;
   updateEconomicIndicators?(indicators: CountryDeepDiveEconomicIndicator[]): void;
   updateCountryFacts?(data: CountryFactsData): void;
   maximize?(): void;

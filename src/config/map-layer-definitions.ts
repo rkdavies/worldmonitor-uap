@@ -81,6 +81,7 @@ export const LAYER_REGISTRY: Record<keyof MapLayers, LayerDefinition> = {
   uapSightings:             def('uapSightings',             '&#128760;', 'uapSightings',            'UAP Sightings'),
   uapSensorStations:        def('uapSensorStations',        '&#128225;', 'uapSensorStations',       'Sensor Stations'),
   uapHistoricalHotspots:    def('uapHistoricalHotspots',   '&#128293;', 'uapHistoricalHotspots',   'Historical Hotspots'),
+  uapReportingContext:      def('uapReportingContext',     '&#127774;', 'uapReportingContext',     'Reporting context'),
 };
 
 /**
@@ -192,7 +193,7 @@ const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
     'outages', 'cyberThreats', 'natural', 'fires',
     'waterways', 'economic', 'minerals', 'gpsJamming',
     'satellites', 'ciiChoropleth', 'dayNight', 'webcams',
-    'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots',
+    'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots', 'uapReportingContext',
   ],
   tech: [
     'startupHubs', 'techHQs', 'accelerators', 'cloudRegions',
@@ -216,8 +217,8 @@ const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
     'natural', 'weather', 'outages', 'dayNight',
   ],
   uap: [
-    'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots',
-    'nuclear', 'bases', 'military', 'conflicts',
+    'uapSightings', 'uapReportingContext',
+    'nuclear', 'bases', 'flights',
     'weather', 'dayNight',
   ],
 };

@@ -127,4 +127,23 @@ export const VARIANT_META: { full: VariantMeta; [k: string]: VariantMeta } = {
       'Futures market data',
     ],
   },
+  uap: {
+    title: 'UAP Monitor',
+    description: 'UAP and anomalous activity monitoring: sightings, institutional reports, sensor coverage, and disclosure-related intelligence.',
+    keywords: 'UAP, UFO, anomalous activity, sightings, NUFORC, disclosure, institutional reports, sensor stations, UAP monitoring',
+    url: 'https://uap.worldmonitor.app/',
+    siteName: 'UAP Monitor',
+    shortName: 'UAP Monitor',
+    subject: 'UAP and Anomalous Activity Intelligence',
+    classification: 'UAP Dashboard, Sightings Tracker, Disclosure Intelligence',
+    categories: ['news', 'science'],
+    features: [
+      'UAP sightings map',
+      'Anomalous Activity Index',
+      'Institutional reports',
+      'Sensor station coverage',
+      'Sighting shapes and timelines',
+      'Country briefs',
+    ],
+  },
 };

@@ -18,6 +18,8 @@ export interface IntelligenceCache {
   orefAlerts?: { alertCount: number; historyCount24h: number };
   advisories?: SecurityAdvisory[];
   imageryScenes?: Array<{ id: string; satellite: string; datetime: string; resolutionM: number; mode: string; geometryGeojson: string; previewUrl: string; assetUrl: string }>;
+  /** UAP sightings from the map layer (list-uap-sightings). timestamp = occurred (Unix s). Used for country brief Active Signals and Shapes. */
+  uapSightings?: Array<{ lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number; country?: string }>;
 }
 
 export interface AppContext {

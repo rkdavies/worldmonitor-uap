@@ -399,6 +399,38 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
       { name: 'Shareable', url: 'https://www.shareable.net/feed/' },
     ],
   },
+
+  uap: {
+    'uap-news': [
+      { name: 'UAP News (Google)', url: gn('(UAP OR UFO OR "unidentified aerial" OR "non-human intelligence" OR disclosure) when:7d') },
+      { name: 'The Debrief', url: 'https://thedebrief.org/feed/' },
+      { name: 'Space.com', url: 'https://www.space.com/feeds.xml' },
+      { name: 'UAP Headlines', url: gn('(UAP OR UFO) disclosure OR Congress OR AARO when:7d') },
+    ],
+    'uap-institutional': [
+      { name: 'NASA Breaking News', url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss' },
+      { name: 'NASA News', url: gn('site:nasa.gov (UAP OR space OR astronomy) when:7d') },
+      { name: 'DoD UAP', url: gn('site:defense.gov UAP OR UFO when:30d') },
+      { name: 'AARO', url: gn('site:aaro.mil OR AARO UAP when:30d') },
+      { name: 'FOIA UAP Release', url: gn('FOIA UFO UAP release government when:30d') },
+    ],
+    'uap-investigative': [
+      { name: 'UAP Investigative', url: gn('(UAP OR UFO) investigative OR investigation OR disclosure journalism when:14d') },
+      { name: 'The Debrief', url: 'https://thedebrief.org/feed/' },
+      { name: 'UFO Investigation', url: gn('"UFO investigation" OR "UAP disclosure" when:14d') },
+    ],
+    'uap-scientific': [
+      { name: 'Space.com', url: 'https://www.space.com/feeds.xml' },
+      { name: 'arXiv Astrophysics', url: 'https://export.arxiv.org/rss/astro-ph.CO' },
+      { name: 'arXiv Space Physics', url: 'https://export.arxiv.org/rss/physics.space-ph' },
+      { name: 'Space & Astronomy', url: gn('(astrophysics OR astronomy OR "space exploration") when:3d') },
+      { name: 'NASA Technology', url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss' },
+    ],
+    'uap-sightings': [
+      { name: 'UFO Sightings', url: gn('(UFO sighting OR UAP report OR NUFORC) when:7d') },
+      { name: 'UAP Reports', url: gn('"UAP report" OR "UFO sighting" when:7d') },
+    ],
+  },
 };
 
 export const INTEL_SOURCES: ServerFeed[] = [

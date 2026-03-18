@@ -1,0 +1,114 @@
+---
+title: "UAP Sightings from Local NUFORC Repo"
+description: "Use the nuforc_sightings_data repo to seed the last 200 UAP sightings and update them regularly."
+---
+
+The [nuforc_sightings_data](https://github.com/timothyrenner/nuforc_sightings_data) repo provides scraped, cleaned, and geocoded NUFORC reports. You can use a local clone to feed **the last 200 entries** into World Monitor and **update them regularly** without relying on live NUFORC scraping or data.world.
+
+## One-time: get the last 200 from the repo
+
+1. **Clone and fetch data** (in the nuforc repo):
+
+   ```bash
+   cd ~/git/nuforc   # or your clone path
+   dvc pull
+   dvc repro
+   ```
+
+   This produces `data/processed/nuforc_reports.csv` (and requires GeoLite2 in `data/external/`; see the repo README). The first run is slow (hours); later runs can be limited to recent dates (see below).
+
+2. **Seed Redis from that CSV** (in the worldmonitor repo):
+
+   ```bash
+   cd ~/git/worldmonitor
+   export UPSTASH_REDIS_REST_URL="https://..."   # same as Vercel
+   export UPSTASH_REDIS_REST_TOKEN="..."
+   node scripts/seed-uap-from-nuforc-repo.mjs
+   ```
+
+   The script reads `~/git/nuforc/data/processed/nuforc_reports.csv`, sorts by date, takes the **last 200** reports, and writes them to the same Redis key the API uses (`uap:sightings:nuforc:v1`). The map will then serve these until the cache expires (default 1 hour) or you re-run the script.
+
+   To use a different CSV path:
+
+   ```bash
+   NUFORC_REPO_CSV=/path/to/nuforc_reports.csv node scripts/seed-uap-from-nuforc-repo.mjs
+   ```
+
+## Regular updates (recent reports only)
+
+### Option A: Raw JSON only (no merge/geocode)
+
+If you only need a quick feed and are fine with **state/country centroid** locations (no city-level lat/lon), you can seed directly from the raw crawl output:
+
+1. **Crawl the last N days** (e.g. 14):
+
+   ```bash
+   cd ~/git/nuforc
+   chmod +x scripts/crawl-recent.sh
+   ./scripts/crawl-recent.sh 14
+   ```
+
+   This writes `data/raw/nuforc_reports_new.json`.
+
+2. **Seed from raw JSON** (in worldmonitor):
+
+   ```bash
+   cd ~/git/worldmonitor
+   node scripts/seed-uap-from-nuforc-repo.mjs
+   ```
+
+   The script prefers `~/git/nuforc/data/raw/nuforc_reports_new.json` if it exists; it geocodes using US state and country centroids (no GeoLite2). To force raw JSON:
+
+   ```bash
+   NUFORC_REPO_RAW_JSON=/path/to/nuforc_reports_new.json node scripts/seed-uap-from-nuforc-repo.mjs
+   ```
+
+### Option B: Full pipeline (merge + geocode, then CSV)
+
+For city-level lat/lon, use the **recent-only** spider, then merge and process:
+
+1. **Crawl only the last N days** (e.g. 14):
+
+   ```bash
+   cd ~/git/nuforc
+   chmod +x scripts/crawl-recent.sh
+   ./scripts/crawl-recent.sh 14
+   ```
+
+   This writes `data/raw/nuforc_reports_new.json` using the spider’s `start_date` / `stop_date` (see [nuforc_report_spider.py](https://github.com/timothyrenner/nuforc_sightings_data/blob/main/nuforc_reports/nuforc_reports/spiders/nuforc_report_spider.py)).
+
+2. **Merge and process** (still in nuforc repo):
+
+   You need the existing `data/raw/nuforc_reports.json` (e.g. from an earlier `dvc pull` or full run) so the merge step can combine old + new:
+
+   ```bash
+   # If you don’t have nuforc_reports.json yet, run a full pipeline once or dvc pull.
+   dvc repro merge-reports
+   dvc repro geocode-reports
+   ```
+
+   Or run the pipeline stages manually (see `dvc.yaml`).
+
+3. **Re-seed World Monitor**:
+
+   ```bash
+   cd ~/git/worldmonitor
+   node scripts/seed-uap-from-nuforc-repo.mjs
+   ```
+
+4. **Schedule it** (e.g. cron weekly):
+
+   ```cron
+   0 3 * * 0 cd /path/to/nuforc && ./scripts/crawl-recent.sh 14 && dvc repro merge-reports && dvc repro geocode-reports && cd /path/to/worldmonitor && node scripts/seed-uap-from-nuforc-repo.mjs
+   ```
+
+(Adjust paths and ensure `UPSTASH_REDIS_*` are set in the environment used by cron.)
+
+## How the API uses this
+
+The UAP sightings API checks Redis first. If `uap:sightings:nuforc:v1` is set (by this script), it serves that list. Otherwise it falls back to live NUFORC scraping or data.world (if `DATA_WORLD_TOKEN` is set), then to the built-in seed list. So seeding from the nuforc repo **overrides** those sources until the key expires or is overwritten.
+
+## Notes
+
+- The nuforc repo’s [terms-of-service notice](https://github.com/timothyrenner/nuforc_sightings_data#readme) applies to scraping NUFORC; using a local clone and this seed script is at your own discretion.
+- GeoLite2 (and thus `geocode-reports`) is required for `nuforc_reports.csv` with city-level lat/lon. The seed script can also read raw `nuforc_reports_new.json` and geocode with state/country centroids only (no GeoLite2).

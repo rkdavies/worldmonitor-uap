@@ -95,6 +95,26 @@ description: "Comprehensive documentation of all data sources, feed tiers, and c
 
 </details>
 
+<details>
+<summary><strong>UAP Situational Awareness</strong> (UAP variant)</summary>
+
+The UAP (Unidentified Anomalous Phenomena) variant provides a dedicated dashboard for global UAP monitoring, aligned with institutional and citizen-science data sources.
+
+- **UAP News** — The Debrief, Liberation Times, Space.com, and curated Google News UAP/AARO/NASA feeds
+- **Institutional** — NASA UAP, AARO/DoD, and Pentagon UAP–related coverage
+- **Investigative** — The Black Vault, Weaponized podcast, and UAP disclosure/legislative coverage
+- **Scientific** — Galileo Project and scientific UAP research feeds
+- **Sightings** — NUFORC, Enigma Labs, and sighting-report feeds
+- **Anomalous Activity Index (AAI)** — 90-day regional sighting density; **adjusted AAI** down-weights regions with high *reporting opportunity* (literature-aligned proxies after Medina et al., *Scientific Reports* 2023: sky visibility, airport/air traffic, military-training context). **Raw score** remains unadjusted density. **Residual index** is peer-normalized after expectation weighting. This frames *reporting conditions*, not proven anomalous physics.
+- **Sensor stations** — Static layer for Galileo Project (Harvard) and Skinwalker Ranch
+- **Map layers** — UAP sightings, sensor stations, historical hotspots, **reporting context** (one national context index per country; **large countries** show **multiple disks** via optional `mapAnchors` in `shared/uap-observation-context-by-region.json`—same index everywhere, sub-labels e.g. USA West / Northeast); smaller regions use a single anchor; **military**, **bases**, **flights**, **nuclear**, **conflicts**, **weather**
+
+**Observation context** — `shared/uap-observation-context-by-region.json`: **`airTraffic`** is regenerated from [OurAirports](https://ourairports.com/data/) (CC0): counts of `large_airport` + `medium_airport` per country, log-scaled 8–95 among tracked regions. Run `npm run ingest:uap-observation-context` (network) to refresh; provenance in `shared/uap-observation-ingest-meta.json`. **`sky`** and **`militaryTraining`** remain expert-seeded until VIIRS / FAA SUA ingestion lands.
+
+**API**: `/api/uap/v1` — `list-uap-sightings`, `list-uap-institutional-reports`, `list-uap-sensor-stations`, `get-aai-scores` (returns `observationContextIndex`, `adjustedAaiScore`, `residualActivityIndex`, `methodologyNote`). Data can come from data.world (if `DATA_WORLD_TOKEN` is set), live NUFORC scrape, or Redis seeded from the [local nuforc_sightings_data repo](/uap-nuforc-repo) (last 200, updated regularly).
+
+</details>
+
 ---
 
 ## Intelligence Feeds
@@ -143,9 +163,7 @@ Government travel advisories serve as expert risk assessments from national inte
 
 **Sources**: 4 government advisory feeds (US State Dept, Australia DFAT Smartraveller, UK FCDO, New Zealand MFAT), 13 US Embassy country-specific alert feeds (Thailand, UAE, Germany, Ukraine, Mexico, India, Pakistan, Colombia, Poland, Bangladesh, Italy, Dominican Republic, Myanmar), and health agency feeds (CDC Travel Notices, ECDC epidemiological updates, WHO News, WHO Africa Emergencies).
 
-**Advisory levels** (ranked): Do-Not-Travel (4) → Reconsider Travel (3) → Exercise Caution (2) → Normal (1) → Info (0). Both RSS (item) and Atom (entry) formats are parsed. Country extraction uses a 265-entry country name map (generated from GeoJSON + aliases) for accurate matching of compound names and alternative spellings.
-
-**Architecture**: Advisories follow the gold standard pattern. A Railway cron seed (`seed-security-advisories.mjs`) fetches all 24 feeds hourly via the relay RSS proxy, deduplicates by title, builds a `byCountry` risk-level map, and writes to Redis. The Vercel `ListSecurityAdvisories` RPC reads Redis only (no external calls). Bootstrap hydration provides instant advisory data on page load.
+**Advisory levels** (ranked): Do-Not-Travel (4) → Reconsider Travel (3) → Exercise Caution (2) → Normal (1) → Info (0). Both RSS (item) and Atom (entry) formats are parsed. Country extraction uses regex parsing of advisory titles with `nameToCountryCode()` lookup.
 
 **CII integration** — advisories feed into instability scores through two mechanisms:
 

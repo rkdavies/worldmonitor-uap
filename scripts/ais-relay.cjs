@@ -13,7 +13,7 @@ const http = require('http');
 const https = require('https');
 const zlib = require('zlib');
 const path = require('path');
-const { readFileSync } = require('fs');
+const { readFileSync, existsSync } = require('fs');
 const crypto = require('crypto');
 const v8 = require('v8');
 const { WebSocketServer, WebSocket } = require('ws');
@@ -81,6 +81,43 @@ const RELAY_RSS_RATE_LIMIT_MAX = Number.isFinite(Number(process.env.RELAY_RSS_RA
   ? Number(process.env.RELAY_RSS_RATE_LIMIT_MAX) : 300;
 const RELAY_LOG_THROTTLE_MS = Math.max(1000, Number(process.env.RELAY_LOG_THROTTLE_MS || 10000));
 const ALLOW_VERCEL_PREVIEW_ORIGINS = process.env.ALLOW_VERCEL_PREVIEW_ORIGINS === 'true';
+
+(function loadOpenSkyFromCredentialsJson() {
+  const idEnv = String(process.env.OPENSKY_CLIENT_ID || '').trim();
+  const secEnv = String(process.env.OPENSKY_CLIENT_SECRET || '').trim();
+  if (idEnv && secEnv) return;
+  try {
+    const credPath = path.join(process.cwd(), 'credentials.json');
+    if (!existsSync(credPath)) return;
+    const j = JSON.parse(readFileSync(credPath, 'utf8'));
+    const nested = j.opensky && typeof j.opensky === 'object' ? j.opensky : null;
+    const id = String(
+      j.OPENSKY_CLIENT_ID ||
+        j.client_id ||
+        j.clientId ||
+        nested?.client_id ||
+        nested?.OPENSKY_CLIENT_ID ||
+        nested?.clientId ||
+        '',
+    ).trim();
+    const sec = String(
+      j.OPENSKY_CLIENT_SECRET ||
+        j.client_secret ||
+        j.clientSecret ||
+        nested?.client_secret ||
+        nested?.OPENSKY_CLIENT_SECRET ||
+        nested?.clientSecret ||
+        '',
+    ).trim();
+    if (id && sec) {
+      process.env.OPENSKY_CLIENT_ID = id;
+      process.env.OPENSKY_CLIENT_SECRET = sec;
+      console.log('[Relay] OpenSky credentials loaded from credentials.json');
+    }
+  } catch (e) {
+    console.warn('[Relay] credentials.json (OpenSky):', e && e.message);
+  }
+})();
 
 // OpenSky proxy — routes through residential proxy to avoid Railway IP blocks
 const OPENSKY_PROXY_AUTH = process.env.OPENSKY_PROXY_AUTH || process.env.OREF_PROXY_AUTH || '';
@@ -6632,8 +6669,9 @@ function handleYouTubeLiveRequest(req, res) {
       JSON.stringify({ error: 'Missing channel parameter' }));
   }
 
-  const channelHandle = channel.startsWith('@') ? channel : `@${channel}`;
-  const cacheKey = `ch:${channelHandle}`;
+  const trimmed = channel.trim();
+  const channelKey = /^UC[a-zA-Z0-9_-]{22}$/.test(trimmed) ? `id:${trimmed}` : (trimmed.startsWith('@') ? trimmed : `@${trimmed}`);
+  const cacheKey = `ch:${channelKey}`;
   const cached = ytLiveCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < YT_CACHE_TTL) {
     return sendCompressed(req, res, 200, {
@@ -6642,7 +6680,9 @@ function handleYouTubeLiveRequest(req, res) {
     }, cached.json);
   }
 
-  const liveUrl = `https://www.youtube.com/${channelHandle}/live`;
+  const liveUrl = /^UC[a-zA-Z0-9_-]{22}$/.test(trimmed)
+    ? `https://www.youtube.com/channel/${trimmed}/live`
+    : `https://www.youtube.com/${trimmed.startsWith('@') ? trimmed : `@${trimmed}`}/live`;
   ytFetch(liveUrl)
     .then(r => {
       if (!r.ok) {

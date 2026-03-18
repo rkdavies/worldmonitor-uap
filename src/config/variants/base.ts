@@ -43,6 +43,7 @@ export const STORAGE_KEYS = {
   mapMode: 'worldmonitor-map-mode',          // 'flat' | 'globe'
   activeChannel: 'worldmonitor-active-channel',
   webcamPrefs: 'worldmonitor-webcam-prefs',
+  skinwalkerViewMode: 'worldmonitor-skinwalker-view-mode',
 } as const;
 
 // Type definitions for variant configs

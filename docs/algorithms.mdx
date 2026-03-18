@@ -30,6 +30,14 @@ The server-side score (`get-risk-scores.ts`) uses the same formulas as the front
 
 **Boosts**: Advisory boost (+15 do-not-travel, +10 reconsider, +5 caution), OREF blend boost for Israel (+15 active alerts, +5/10 based on 24h history count), climate severity (up to +15), cyber threats (up to +10), wildfires (up to +8).
 
+### Anomalous Activity Index (AAI) — UAP variant
+
+Regional **raw score** (0–100): 90-day NUFORC (or data.world) sighting count normalized to the busiest region (up to 70 points) plus optional institutional activity.
+
+**Observation context index** (0–100): Weighted blend of proxies for sky visibility, commercial/military air traffic context, and military-training context per region (`shared/uap-observation-context-by-region.json`), with relative weights aligned to Medina et al., *Scientific Reports* (2023). The **airTraffic** field is refreshed from OurAirports (large + medium airports per country, log-scaled among tracked regions) via `npm run ingest:uap-observation-context`; see `shared/uap-observation-ingest-meta.json` for counts and timestamp.
+
+**Expectation multiplier** \(E\): Maps context index to ~0.42–1.78. **Effective count** = sightings\(_{90d}\) / \(E\). **Adjusted density** = min(70, effective / max(effective)×70). **Adjusted AAI** = raw score plus the delta between adjusted and raw, **capped at ±15 points** (prevents single-factor domination). **Residual index** (0–100) = effective / max(effective)×100 across returned regions. **Level** bands apply to adjusted score. This does **not** assert more physical UAP activity—only activity relative to modeled reporting opportunity.
+
 ### Hotspot Escalation Scoring
 
 Intelligence hotspots receive dynamic escalation scores blending four normalized signals (0–100):

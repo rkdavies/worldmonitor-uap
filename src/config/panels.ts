@@ -13,7 +13,7 @@ const _desktop = isDesktopRuntime();
 const FULL_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
-  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Skinwalker Ranch', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 1 },
   'windy-webcams': { name: 'Windy Live Webcam', enabled: false, priority: 2 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
@@ -132,6 +132,7 @@ const FULL_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 const FULL_MOBILE_MAP_LAYERS: MapLayers = {
@@ -195,6 +196,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 // ============================================
@@ -203,7 +205,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
 const TECH_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Tech Map', enabled: true, priority: 1 },
   'live-news': { name: 'Tech Headlines', enabled: true, priority: 1 },
-  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Skinwalker Ranch', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   'windy-webcams': { name: 'Windy Live Webcam', enabled: false, priority: 2 },
   insights: { name: 'AI Insights', enabled: true, priority: 1 },
@@ -302,6 +304,7 @@ const TECH_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 const TECH_MOBILE_MAP_LAYERS: MapLayers = {
@@ -365,6 +368,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 // ============================================
@@ -373,7 +377,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
 const FINANCE_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Markets Map', enabled: true, priority: 1 },
   'live-news': { name: 'Market Headlines', enabled: true, priority: 1 },
-  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Skinwalker Ranch', enabled: true, priority: 1 },
   'live-webcams': { name: 'Live Webcams', enabled: true, priority: 2 },
   'windy-webcams': { name: 'Windy Live Webcam', enabled: false, priority: 2 },
   insights: { name: 'AI Market Insights', enabled: true, priority: 1 },
@@ -473,6 +477,7 @@ const FINANCE_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
@@ -536,6 +541,7 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 // ============================================
@@ -615,6 +621,7 @@ const HAPPY_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
@@ -678,6 +685,7 @@ const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 // ============================================
@@ -686,7 +694,7 @@ const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
 const COMMODITY_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Commodity Map', enabled: true, priority: 1 },
   'live-news': { name: 'Commodity Headlines', enabled: true, priority: 1 },
-  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Skinwalker Ranch', enabled: true, priority: 1 },
   insights: { name: 'AI Commodity Insights', enabled: true, priority: 1 },
   'commodity-news': { name: 'Commodity News', enabled: true, priority: 1 },
   'gold-silver': { name: 'Gold & Silver', enabled: true, priority: 1 },
@@ -772,6 +780,7 @@ const COMMODITY_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
@@ -835,6 +844,7 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 // ============================================
@@ -843,7 +853,7 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
 const UAP_PANELS: Record<string, PanelConfig> = {
   map: { name: 'Global Map', enabled: true, priority: 1 },
   'live-news': { name: 'Live News', enabled: true, priority: 1 },
-  'live-news-2': { name: 'Live News 2', enabled: true, priority: 1 },
+  'live-news-2': { name: 'Skinwalker Ranch', enabled: true, priority: 1 },
   intel: { name: 'Intel Feed', enabled: true, priority: 1 },
   'uap-news': { name: 'UAP News', enabled: true, priority: 1 },
   'uap-institutional': { name: 'Institutional (AARO/NASA)', enabled: true, priority: 1 },
@@ -860,7 +870,7 @@ const UAP_MAP_LAYERS: MapLayers = {
   iranAttacks: false,
   gpsJamming: false,
   satellites: false,
-  conflicts: true,
+  conflicts: false,
   bases: true,
   cables: false,
   pipelines: false,
@@ -876,8 +886,8 @@ const UAP_MAP_LAYERS: MapLayers = {
   cyberThreats: false,
   datacenters: false,
   protests: false,
-  flights: false,
-  military: true,
+  flights: true,
+  military: false,
   natural: false,
   spaceports: false,
   minerals: false,
@@ -908,15 +918,19 @@ const UAP_MAP_LAYERS: MapLayers = {
   commodityPorts: false,
   webcams: false,
   uapSightings: true,
-  uapSensorStations: true,
-  uapHistoricalHotspots: true,
+  uapSensorStations: false,
+  uapHistoricalHotspots: false,
+  uapReportingContext: true,
 };
 
 const UAP_MOBILE_MAP_LAYERS: MapLayers = {
   ...UAP_MAP_LAYERS,
   uapSightings: true,
   uapSensorStations: false,
-  uapHistoricalHotspots: true,
+  uapHistoricalHotspots: false,
+  uapReportingContext: false,
+  /** Live ADS-B enabled; client uses longer poll interval on mobile. */
+  flights: true,
 };
 
 // ============================================
@@ -960,6 +974,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy'
 
 /** Maps map-layer toggle keys to their data-freshness source IDs (single source of truth). */
 export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> = {
+  flights: ['opensky_traffic', 'aviation_delays'],
   military: ['opensky', 'wingbits'],
   ais: ['ais'],
   natural: ['usgs'],

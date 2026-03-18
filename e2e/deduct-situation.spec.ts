@@ -2,6 +2,10 @@ import { expect, test } from '@playwright/test';
 
 test.describe('Deduct Situation Panel Options', () => {
     test('It successfully requests deduction from the intelligence API', async ({ page }) => {
+        test.skip(
+          process.env.VITE_VARIANT === 'uap',
+          'Deduct Situation panel is not in the UAP variant command palette',
+        );
         await page.goto('/?view=global');
 
         // MOCK the backend deduct-situation RPC response UNLESS testing real LLM flows
@@ -20,7 +24,7 @@ test.describe('Deduct Situation Panel Options', () => {
         await page.keyboard.press('ControlOrMeta+k');
         await page.waitForSelector('.command-palette');
         await page.fill('.command-palette input', 'deduct');
-        await page.click('text="Jump to Deduct Situation"');
+        await page.click('text="Panel: Deduct Situation"');
 
         // Ensure the panel is visible and ready
         const panel = page.locator('.wm-panel', { hasText: 'DEDUCT SITUATION' });

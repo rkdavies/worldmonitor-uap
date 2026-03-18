@@ -48,7 +48,7 @@ import type { Earthquake } from '../services/earthquakes';
 import type { WeatherAlert } from '../services/weather';
 
 type Scenario = 'alpha' | 'beta';
-type HarnessVariant = 'full' | 'tech' | 'finance';
+type HarnessVariant = 'full' | 'tech' | 'finance' | 'uap';
 type HarnessLayerKey = keyof MapLayers;
 type PulseProtestScenario =
   | 'none'
@@ -191,6 +191,7 @@ const allLayersEnabled: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 const allLayersDisabled: MapLayers = {
@@ -249,6 +250,7 @@ const allLayersDisabled: MapLayers = {
   uapSightings: false,
   uapSensorStations: false,
   uapHistoricalHotspots: false,
+  uapReportingContext: false,
 };
 
 const SEEDED_NEWS_LOCATIONS: Array<{
@@ -748,11 +750,14 @@ const filterScenariosForVariant = (variant: HarnessVariant): VisualScenario[] =>
   );
 };
 
-const currentHarnessVariant: HarnessVariant = SITE_VARIANT === 'tech'
-  ? 'tech'
-  : SITE_VARIANT === 'finance'
-  ? 'finance'
-  : 'full';
+const currentHarnessVariant: HarnessVariant =
+  SITE_VARIANT === 'tech'
+    ? 'tech'
+    : SITE_VARIANT === 'finance'
+      ? 'finance'
+      : SITE_VARIANT === 'uap'
+        ? 'uap'
+        : 'full';
 
 const buildProtests = (scenario: Scenario): SocialUnrestEvent[] => {
   const title =
@@ -1043,8 +1048,31 @@ const seedAllDynamicData = (): void => {
   ];
 
   map.setRenderPaused(true);
-  map.setLayers(allLayersEnabled);
+  const deckMap = map as unknown as {
+    serverBasesLoaded: boolean;
+    serverBases: unknown[];
+  };
+  deckMap.serverBasesLoaded = false;
+  deckMap.serverBases = [];
+
+  const initialLayers: MapLayers =
+    SITE_VARIANT === 'uap'
+      ? { ...allLayersEnabled, uapSightings: true }
+      : allLayersEnabled;
+  map.setLayers(initialLayers);
   map.setZoom(5);
+  if (SITE_VARIANT === 'uap') {
+    map.setUapSightings([
+      {
+        id: 'harness-uap-seed',
+        lat: 40.0,
+        lon: -100.0,
+        timestamp: Math.floor(Date.now() / 1000),
+        shape: 'light',
+        description: 'Harness seed for UAP E2E',
+      },
+    ]);
+  }
   map.setEarthquakes(earthquakes);
   map.setWeatherAlerts(weather);
   map.setOutages(outages);
@@ -1211,7 +1239,15 @@ const isVisualScenarioReady = (scenarioId: string): boolean => {
   );
 
   for (const expectedLayerId of scenario.expectedDeckLayers) {
-    if ((layersById.get(expectedLayerId) ?? 0) <= 0) {
+    let count = layersById.get(expectedLayerId) ?? 0;
+    if (
+      count <= 0 &&
+      expectedLayerId === 'conflict-zones-layer' &&
+      (layersById.get('conflict-zones-layer-country-geometry') ?? 0) > 0
+    ) {
+      count = 1;
+    }
+    if (count <= 0) {
       return false;
     }
   }

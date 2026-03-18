@@ -91,6 +91,9 @@ export interface CarrierOps {
   updatedAt: Date;
 }
 
+/** OpenSky ADS-B emitter category 14 = UAV (when extended=1). */
+export const OPENSKY_UAV_ADSB_CATEGORY = 14;
+
 export interface PositionSample {
   icao24: string;
   callsign: string;
@@ -102,6 +105,8 @@ export interface PositionSample {
   onGround: boolean;
   source: string;
   observedAt: Date;
+  /** OpenSky extended emitter category; 14 = UAV ADS-B. */
+  emitterCategory?: number;
 }
 
 export interface PriceQuote {
@@ -239,11 +244,33 @@ function toDisplayCarrierOps(p: ProtoCarrierOps): CarrierOps {
 }
 
 function toDisplayPosition(p: ProtoPosition): PositionSample {
+  const ext = p as ProtoPosition & { emitterCategory?: number };
   return {
     icao24: p.icao24, callsign: p.callsign, lat: p.lat, lon: p.lon,
     altitudeFt: Math.round(p.altitudeM * 3.281),
     groundSpeedKts: p.groundSpeedKts, trackDeg: p.trackDeg, onGround: p.onGround,
     source: p.source, observedAt: new Date(p.observedAt),
+    emitterCategory: ext.emitterCategory,
+  };
+}
+
+function toDisplayPositionFromTrackJson(p: Record<string, unknown>): PositionSample {
+  const altM = Number(p.altitudeM ?? p.altitude_m ?? 0);
+  return {
+    icao24: String(p.icao24 ?? ''),
+    callsign: String(p.callsign ?? '').trim(),
+    lat: Number(p.lat),
+    lon: Number(p.lon),
+    altitudeFt: Math.round(altM * 3.281),
+    groundSpeedKts: Number(p.groundSpeedKts ?? p.ground_speed_kts ?? 0),
+    trackDeg: Number(p.trackDeg ?? p.track_deg ?? 0),
+    onGround: Boolean(p.onGround ?? p.on_ground),
+    source: String(p.source ?? 'POSITION_SOURCE_UNSPECIFIED'),
+    observedAt: new Date(Number(p.observedAt ?? p.observed_at ?? Date.now())),
+    emitterCategory: (() => {
+      const c = Number(p.emitterCategory ?? p.emitter_category ?? 0);
+      return c > 0 ? c : undefined;
+    })(),
   };
 }
 
@@ -323,10 +350,30 @@ export async function fetchFlightStatus(flightNumber: string, date?: string, ori
   }, []);
 }
 
-export async function fetchAircraftPositions(opts: { icao24?: string; callsign?: string; swLat?: number; swLon?: number; neLat?: number; neLon?: number }): Promise<PositionSample[]> {
+export async function fetchAircraftPositions(opts: {
+  icao24?: string;
+  callsign?: string;
+  swLat?: number;
+  swLon?: number;
+  neLat?: number;
+  neLon?: number;
+  uavOnly?: boolean;
+}): Promise<PositionSample[]> {
   return breakerTrack.execute(async () => {
-    const r = await client.trackAircraft({ icao24: opts.icao24 ?? '', callsign: opts.callsign ?? '', swLat: opts.swLat ?? 0, swLon: opts.swLon ?? 0, neLat: opts.neLat ?? 0, neLon: opts.neLon ?? 0 });
-    return r.positions.map(toDisplayPosition);
+    const base = getRpcBaseUrl().replace(/\/$/, '');
+    const q = new URLSearchParams();
+    if (opts.icao24) q.set('icao24', opts.icao24);
+    if (opts.callsign) q.set('callsign', opts.callsign);
+    q.set('sw_lat', String(opts.swLat ?? 0));
+    q.set('sw_lon', String(opts.swLon ?? 0));
+    q.set('ne_lat', String(opts.neLat ?? 0));
+    q.set('ne_lon', String(opts.neLon ?? 0));
+    if (opts.uavOnly) q.set('uav_only', 'true');
+    const url = `${base}/api/aviation/v1/track-aircraft?${q}`;
+    const resp = await globalThis.fetch(url, { headers: { Accept: 'application/json' } });
+    if (!resp.ok) throw new Error(`track-aircraft HTTP ${resp.status}`);
+    const r = (await resp.json()) as { positions?: Record<string, unknown>[] };
+    return (r.positions ?? []).map(toDisplayPositionFromTrackJson);
   }, []);
 }
 

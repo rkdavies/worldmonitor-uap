@@ -102,8 +102,6 @@ import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { getHydratedData } from '@/services/bootstrap';
-import { canQueueAiClassification, AI_CLASSIFY_MAX_PER_FEED } from '@/services/ai-classify-queue';
-import { classifyWithAI } from '@/services/threat-classifier';
 import { ingestHeadlines } from '@/services/trending-keywords';
 import type { ListFeedDigestResponse } from '@/generated/client/worldmonitor/news/v1/service_client';
 import type { GetSectorSummaryResponse, ListMarketQuotesResponse } from '@/generated/client/worldmonitor/market/v1/service_client';
@@ -473,6 +471,10 @@ export class DataLoaderManager implements AppModule {
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.satellites && this.ctx.map?.isGlobeMode?.()) tasks.push({ name: 'satellites', task: runGuarded('satellites', () => this.loadSatellites()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.webcams) tasks.push({ name: 'webcams', task: runGuarded('webcams', () => this.loadWebcams()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.uapSightings) tasks.push({ name: 'uapSightings', task: runGuarded('uapSightings', () => this.loadUapSightings()) });
+    const scheduleUapAai =
+      SITE_VARIANT !== 'happy' &&
+      (SITE_VARIANT === 'uap' || !!this.ctx.mapLayers.uapSightings);
+    if (scheduleUapAai) tasks.push({ name: 'uapAai', task: runGuarded('uapAai', () => this.loadAaiScores()) });
 
     if (SITE_VARIANT !== 'happy') {
       tasks.push({ name: 'techReadiness', task: runGuarded('techReadiness', () => (this.ctx.panels['tech-readiness'] as TechReadinessPanel)?.refresh()) });
@@ -776,20 +778,6 @@ export class DataLoaderManager implements AppModule {
 
         ingestHeadlines(items.map(i => ({ title: i.title, pubDate: i.pubDate, source: i.source, link: i.link })));
 
-        const aiCandidates = items
-          .filter(i => i.threat?.source === 'keyword')
-          .sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime())
-          .slice(0, AI_CLASSIFY_MAX_PER_FEED);
-        for (const item of aiCandidates) {
-          if (!canQueueAiClassification(item.title)) continue;
-          classifyWithAI(item.title, SITE_VARIANT).then(ai => {
-            if (ai && item.threat && ai.confidence > item.threat.confidence) {
-              item.threat = ai;
-              item.isAlert = ai.level === 'critical' || ai.level === 'high';
-            }
-          }).catch(() => {});
-        }
-
         checkBatchForBreakingAlerts(items);
         this.flashMapForNews(items);
         this.renderNewsForCategory(category, items);
@@ -1037,6 +1025,17 @@ export class DataLoaderManager implements AppModule {
             delete this.ctx.newsByCategory['intel'];
             console.error('[App] Intel feed failed:', intelResult[0]?.reason);
           }
+        }
+      }
+    }
+
+    // UAP variant: news panels (uap-news, uap-institutional, etc.) are not in FEEDS, so they
+    // never get loadNewsCategory; settle them so they leave loading state and show empty message.
+    if (SITE_VARIANT === 'uap') {
+      const loadedCategories = new Set(categories.map(c => c.key));
+      for (const [key, panel] of Object.entries(this.ctx.newsPanels)) {
+        if (key.startsWith('uap-') && !loadedCategories.has(key) && panel) {
+          panel.renderNews([]);
         }
       }
     }
@@ -1879,10 +1878,10 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
-  /** Normalize UAP sighting coordinates: accept lat/lon or latitude/longitude, coerce to numbers, fix swap. */
+  /** Normalize UAP sighting coordinates: accept lat/lon or latitude/longitude, coerce to numbers, fix swap. Preserves country, shape, timestamp (occurred). */
   private static normalizeUapSightingCoords(
-    s: { lat?: number; lon?: number; latitude?: number; longitude?: number; id?: string; description?: string; shape?: string; timestamp?: number },
-  ): { lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number } | null {
+    s: { lat?: number; lon?: number; latitude?: number; longitude?: number; id?: string; description?: string; shape?: string; timestamp?: number; country?: string },
+  ): { lat: number; lon: number; id?: string; description?: string; shape?: string; timestamp?: number; country?: string } | null {
     let lat = Number(s.lat ?? s.latitude ?? NaN);
     let lon = Number(s.lon ?? s.longitude ?? NaN);
     if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
@@ -1900,12 +1899,13 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadUapSightings(): Promise<void> {
-    const UAP_SEED: Array<{ lat: number; lon: number; id: string; description: string; shape: string }> = [
-      { id: 'seed-1', lat: 34.05, lon: -118.24, description: 'Sample sighting (Los Angeles area).', shape: 'Unknown' },
-      { id: 'seed-2', lat: 40.71, lon: -74.01, description: 'Sample sighting (New York area).', shape: 'Unknown' },
-      { id: 'seed-3', lat: 41.88, lon: -87.63, description: 'Sample sighting (Chicago area).', shape: 'Unknown' },
-      { id: 'seed-4', lat: 29.76, lon: -95.37, description: 'Sample sighting (Houston area).', shape: 'Unknown' },
-      { id: 'seed-5', lat: 33.45, lon: -112.07, description: 'Sample sighting (Phoenix area).', shape: 'Unknown' },
+    const nowSec = Math.floor(Date.now() / 1000);
+    const UAP_SEED: Array<{ lat: number; lon: number; id: string; description: string; shape: string; country: string; timestamp: number }> = [
+      { id: 'seed-1', lat: 34.05, lon: -118.24, description: 'Sample sighting (Los Angeles area).', shape: 'Unknown', country: 'USA', timestamp: nowSec - 86400 },
+      { id: 'seed-2', lat: 40.71, lon: -74.01, description: 'Sample sighting (New York area).', shape: 'Unknown', country: 'USA', timestamp: nowSec - 7 * 86400 },
+      { id: 'seed-3', lat: 41.88, lon: -87.63, description: 'Sample sighting (Chicago area).', shape: 'Unknown', country: 'USA', timestamp: nowSec - 30 * 86400 },
+      { id: 'seed-4', lat: 29.76, lon: -95.37, description: 'Sample sighting (Houston area).', shape: 'Unknown', country: 'USA', timestamp: nowSec - 90 * 86400 },
+      { id: 'seed-5', lat: 33.45, lon: -112.07, description: 'Sample sighting (Phoenix area).', shape: 'Unknown', country: 'USA', timestamp: nowSec - 180 * 86400 },
     ];
     try {
       const url = toApiUrl('/api/uap/v1/list-uap-sightings?page_size=200');
@@ -1921,21 +1921,8 @@ export class DataLoaderManager implements AppModule {
         .map((s) => DataLoaderManager.normalizeUapSightingCoords(s as Parameters<typeof DataLoaderManager.normalizeUapSightingCoords>[0]))
         .filter((s): s is NonNullable<typeof s> => s != null);
       const toSet = sightings.length > 0 ? sightings : UAP_SEED;
-      // #region agent log
-      fetch('http://127.0.0.1:7754/ingest/306c5720-478b-46c1-a212-7caa496d04e1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '34b813' },
-        body: JSON.stringify({
-          sessionId: '34b813',
-          location: 'data-loader.ts:loadUapSightings',
-          message: 'UAP sightings sent to map',
-          data: { count: toSet.length, sample: toSet.slice(0, 3).map((s) => ({ id: s.id, lat: s.lat, lon: s.lon })) },
-          timestamp: Date.now(),
-          hypothesisId: 'H4',
-        }),
-      }).catch(() => {});
-      // #endregion
       this.ctx.map?.setUapSightings(toSet);
+      this.ctx.intelligenceCache.uapSightings = toSet;
       this.ctx.map?.setLayerReady('uapSightings', true);
       const isSeedOnly = sightings.length === 0 && toSet.length === UAP_SEED.length;
       if (isSeedOnly) {
@@ -1947,6 +1934,19 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setUapSightings(UAP_SEED);
       this.ctx.map?.setLayerReady('uapSightings', true);
       dataFreshness.recordError('uap_sightings', String(e));
+    }
+  }
+
+  async loadAaiScores(): Promise<void> {
+    try {
+      const url = toApiUrl('/api/uap/v1/get-aai-scores');
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000), cache: 'no-store' });
+      if (!res.ok) throw new Error(`AAI scores ${res.status}`);
+      const data = (await res.json()) as { scores?: unknown[] };
+      const scores = Array.isArray(data.scores) ? data.scores : [];
+      this.callPanel('uap-aai', 'setScores', scores);
+    } catch (e) {
+      this.callPanel('uap-aai', 'setScores', []);
     }
   }
 
@@ -2153,6 +2153,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setFlightDelays(delays);
       this.ctx.map?.setLayerReady('flights', delays.length > 0);
       this.ctx.intelligenceCache.flightDelays = delays;
+      dataFreshness.recordUpdate('aviation_delays', delays.length);
       const severe = delays.filter(d => d.severity === 'major' || d.severity === 'severe' || d.delayType === 'closure');
       if (severe.length > 0) ingestAviationForCII(severe);
       this.ctx.statusPanel?.updateFeed('Flights', {
@@ -2162,6 +2163,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('FAA', { status: 'ok' });
     } catch (error) {
       this.ctx.map?.setLayerReady('flights', false);
+      dataFreshness.recordError('aviation_delays', String(error));
       this.ctx.statusPanel?.updateFeed('Flights', { status: 'error', errorMessage: String(error) });
       this.ctx.statusPanel?.updateApi('FAA', { status: 'error' });
     }

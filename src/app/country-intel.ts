@@ -36,10 +36,31 @@ import { isHeadlineMemoryEnabled } from '@/services/ai-flow-settings';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { trackCountrySelected, trackCountryBriefOpened } from '@/services/analytics';
 import { toApiUrl } from '@/services/runtime';
+import { SITE_VARIANT } from '@/config/variant';
 import type { StrategicPosturePanel } from '@/components/StrategicPosturePanel';
+import type { AaiScore } from '@/generated/client/worldmonitor/uap/v1/service_client';
 import type { NewsItem } from '@/types';
-import { getNearbyInfrastructure } from '@/services/related-assets';
+import { getNearbyInfrastructure, haversineDistanceKm } from '@/services/related-assets';
 import { toFlagEmoji } from '@/utils/country-flag';
+
+/** Map ISO 3166-1 alpha-2 country code to AAI regionId (used by get-aai-scores). */
+const CODE_TO_AAI_REGION: Record<string, string> = {
+  US: 'USA', GB: 'GBR', CA: 'Canada', AU: 'Australia', FR: 'France', DE: 'Germany', JP: 'Japan',
+  BR: 'Brazil', MX: 'Mexico', IN: 'India', ES: 'Spain', IT: 'Italy', NL: 'Netherlands', NZ: 'New Zealand',
+  KR: 'South Korea', ZA: 'South Africa', AR: 'Argentina', RU: 'Russia', CN: 'China', IE: 'Ireland',
+  PT: 'Portugal', PL: 'Poland', BE: 'Belgium', SE: 'Sweden', HU: 'Hungary',
+};
+
+/** Normalize sighting country string to regionId for matching (e.g. "United States" -> "USA"). */
+const COUNTRY_TO_REGION: Record<string, string> = {
+  'United States': 'USA', 'USA': 'USA', 'US': 'USA',
+  'United Kingdom': 'GBR', 'UK': 'GBR', 'GBR': 'GBR', 'GB': 'GBR',
+  'Canada': 'Canada', 'Australia': 'Australia', 'France': 'France', 'Germany': 'Germany',
+  'Japan': 'Japan', 'Brazil': 'Brazil', 'Mexico': 'Mexico', 'India': 'India', 'Spain': 'Spain',
+  'Italy': 'Italy', 'Netherlands': 'Netherlands', 'New Zealand': 'New Zealand', 'South Korea': 'South Korea',
+  'South Africa': 'South Africa', 'Argentina': 'Argentina', 'Russia': 'Russia', 'China': 'China', 'Ireland': 'Ireland',
+  'Portugal': 'Portugal', 'Poland': 'Poland', 'Belgium': 'Belgium', 'Sweden': 'Sweden', 'Hungary': 'Hungary',
+};
 
 type IntlDisplayNamesCtor = new (
   locales: string | string[],
@@ -172,7 +193,43 @@ export class CountryIntelManager implements AppModule {
 
     const signals = this.getCountrySignals(code, country);
 
-    this.ctx.countryBriefPage.show(country, code, score, signals);
+    let aaiScore: AaiScore | null = null;
+    let recentSightings: Array<{ timestamp: number; shape: string; description?: string }> | undefined;
+    if (SITE_VARIANT === 'uap') {
+      const regionId = CODE_TO_AAI_REGION[code.toUpperCase()] ?? code;
+      const mapStats = this.computeUapRegionStatsFromMapLayer(code, regionId);
+      try {
+        const url = toApiUrl(`/api/uap/v1/get-aai-scores?region=${encodeURIComponent(regionId)}`);
+        const res = await fetch(url, { signal: AbortSignal.timeout(10_000), cache: 'no-store' });
+        if (res.ok) {
+          const data = (await res.json()) as { scores?: AaiScore[]; recentSightings?: Array<{ timestamp: number; shape: string; description?: string }> };
+          aaiScore = Array.isArray(data.scores) && data.scores.length > 0 ? data.scores[0]! : null;
+          recentSightings = data.recentSightings;
+        }
+      } catch {
+        aaiScore = null;
+      }
+      if (aaiScore) {
+        aaiScore = { ...aaiScore, ...mapStats.buckets, shapeCounts: mapStats.shapeCounts };
+        recentSightings = mapStats.recentSightings.length > 0 ? mapStats.recentSightings : recentSightings;
+      } else {
+        const nowSec = Math.floor(Date.now() / 1000);
+        aaiScore = {
+          regionId,
+          score: Math.min(100, Math.round((mapStats.buckets.sightings90d ?? 0) * 2)),
+          level: (mapStats.buckets.sightings90d ?? 0) > 0 ? 'moderate' : 'low',
+          trend: 'stable',
+          sightingDensity: mapStats.buckets.sightings90d ?? 0,
+          institutionalActivity: 0,
+          lastUpdated: nowSec,
+          ...mapStats.buckets,
+          shapeCounts: mapStats.shapeCounts,
+        };
+        recentSightings = mapStats.recentSightings;
+      }
+    }
+
+    this.ctx.countryBriefPage.show(country, code, score, signals, aaiScore);
     this.ctx.map?.highlightCountry(code);
     this.ctx.map?.fitCountry(code);
 
@@ -184,12 +241,23 @@ export class CountryIntelManager implements AppModule {
         }
       });
     }
-    this.ctx.countryBriefPage.updateSignalDetails?.(this.buildSignalDetails(code));
-    this.ctx.countryBriefPage.updateMilitaryActivity?.(this.buildMilitarySummary(code, country));
-    this.ctx.countryBriefPage.updateEconomicIndicators?.(this.buildEconomicIndicators(code, score, null));
+
+    if (SITE_VARIANT === 'uap') {
+      this.ctx.countryBriefPage.updateSignalDetails?.(this.buildSignalDetails(code));
+      this.ctx.countryBriefPage.updateSightingShapes?.(aaiScore?.shapeCounts ?? {});
+      this.ctx.countryBriefPage.updateInstitutionalActivity?.(aaiScore?.institutionalActivity ?? 0);
+      this.ctx.countryBriefPage.updateRecentSightings?.(recentSightings ?? []);
+      void this.fetchAndUpdateSensorCoverage(code);
+    } else {
+      this.ctx.countryBriefPage.updateSignalDetails?.(this.buildSignalDetails(code));
+      this.ctx.countryBriefPage.updateMilitaryActivity?.(this.buildMilitarySummary(code, country));
+      this.ctx.countryBriefPage.updateEconomicIndicators?.(this.buildEconomicIndicators(code, score, null));
+    }
 
     const marketClient = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args) });
-    const stockPromise = marketClient.getCountryStockIndex({ countryCode: code })
+    const stockPromise = SITE_VARIANT === 'uap'
+      ? Promise.resolve({ available: false as const, code: '', symbol: '', indexName: '', price: '0', weekChangePercent: '0', currency: '' })
+      : marketClient.getCountryStockIndex({ countryCode: code })
       .then((resp) => ({
         available: resp.available,
         code: resp.code,
@@ -204,16 +272,20 @@ export class CountryIntelManager implements AppModule {
     stockPromise.then((stock) => {
       if (this.ctx.countryBriefPage?.getCode() !== code) return;
       this.ctx.countryBriefPage.updateStock(stock);
-      this.ctx.countryBriefPage.updateEconomicIndicators?.(this.buildEconomicIndicators(code, score, stock));
+      if (SITE_VARIANT !== 'uap') {
+        this.ctx.countryBriefPage.updateEconomicIndicators?.(this.buildEconomicIndicators(code, score, stock));
+      }
     });
 
-    fetchCountryMarkets(country)
-      .then((markets) => {
-        if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateMarkets(markets);
-      })
-      .catch(() => {
-        if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateMarkets([]);
-      });
+    if (SITE_VARIANT !== 'uap') {
+      fetchCountryMarkets(country)
+        .then((markets) => {
+          if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateMarkets(markets);
+        })
+        .catch(() => {
+          if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateMarkets([]);
+        });
+    }
 
     const searchTerms = CountryIntelManager.getCountrySearchTerms(country, code);
     const otherCountryTerms = CountryIntelManager.getOtherCountryTerms(code);
@@ -233,7 +305,9 @@ export class CountryIntelManager implements AppModule {
     });
     this.ctx.countryBriefPage.updateNews(filteredNews.slice(0, 10));
 
-    this.ctx.countryBriefPage.updateInfrastructure(code);
+    if (SITE_VARIANT !== 'uap') {
+      this.ctx.countryBriefPage.updateInfrastructure(code);
+    }
 
     const intelClient = new IntelligenceServiceClient(getRpcBaseUrl(), {
       fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args),
@@ -263,7 +337,9 @@ export class CountryIntelManager implements AppModule {
         });
       });
 
-    this.mountCountryTimeline(code, country);
+    if (SITE_VARIANT !== 'uap') {
+      this.mountCountryTimeline(code, country);
+    }
 
     try {
       const context: Record<string, unknown> = {};
@@ -307,7 +383,7 @@ export class CountryIntelManager implements AppModule {
 
       let briefText = '';
       try {
-        let contextSnapshot = this.buildBriefContextSnapshot(country, code, score, signals, context);
+        let contextSnapshot = this.buildBriefContextSnapshot(country, code, score, signals, context, SITE_VARIANT === 'uap' ? aaiScore : undefined);
 
         if (isHeadlineMemoryEnabled() && mlWorker.isAvailable && mlWorker.isModelLoaded('embeddings') && briefHeadlines.length > 0) {
           try {
@@ -346,8 +422,14 @@ export class CountryIntelManager implements AppModule {
           this.ctx.countryBriefPage?.updateBrief({ brief: fallbackBrief, country, code, fallback: true });
         } else {
           const lines: string[] = [];
-          if (score) lines.push(t('countryBrief.fallback.instabilityIndex', { score: String(score.score), level: t(`countryBrief.levels.${score.level}`), trend: t(`countryBrief.trends.${score.trend}`) }));
-          if (signals.protests > 0) lines.push(t('countryBrief.fallback.protestsDetected', { count: String(signals.protests) }));
+          if (SITE_VARIANT === 'uap' && aaiScore) {
+            const aaiTrendKey = aaiScore.trend === 'up' ? 'rising' : aaiScore.trend === 'down' ? 'falling' : 'stable';
+            lines.push(t('countryBrief.fallback.aaiIndex', { score: String(aaiScore.score), level: t(`countryBrief.levels.${aaiScore.level}`), trend: t(`countryBrief.trends.${aaiTrendKey}`) }));
+            lines.push(t('countryBrief.fallback.sightings90d', { count: String(aaiScore.sightingDensity ?? 0) }));
+            lines.push(t('countryBrief.fallback.institutionalActivity', { count: String(aaiScore.institutionalActivity ?? 0) }));
+          } else {
+            if (score) lines.push(t('countryBrief.fallback.instabilityIndex', { score: String(score.score), level: t(`countryBrief.levels.${score.level}`), trend: t(`countryBrief.trends.${score.trend}`) }));
+            if (signals.protests > 0) lines.push(t('countryBrief.fallback.protestsDetected', { count: String(signals.protests) }));
           if (signals.militaryFlights > 0) lines.push(t('countryBrief.fallback.aircraftTracked', { count: String(signals.militaryFlights) }));
           if (signals.militaryVessels > 0) lines.push(t('countryBrief.fallback.vesselsTracked', { count: String(signals.militaryVessels) }));
           if (signals.activeStrikes > 0) lines.push(t('countryBrief.fallback.activeStrikes', { count: String(signals.activeStrikes) }));
@@ -362,6 +444,7 @@ export class CountryIntelManager implements AppModule {
           if (signals.earthquakes > 0) lines.push(t('countryBrief.fallback.recentEarthquakes', { count: String(signals.earthquakes) }));
           if (signals.orefHistory24h > 0) lines.push(`🚨 Sirens in past 24h: ${signals.orefHistory24h}`);
           if (context.stockIndex) lines.push(t('countryBrief.fallback.stockIndex', { value: context.stockIndex }));
+          }
           if (lines.length > 0) {
             this.ctx.countryBriefPage?.updateBrief({ brief: lines.join('\n'), country, code, fallback: true });
           } else {
@@ -416,35 +499,41 @@ export class CountryIntelManager implements AppModule {
     score: CountryScore | null,
     signals: CountryBriefSignals,
     context: Record<string, unknown>,
+    aaiScore?: AaiScore | null,
   ): string {
     const lines: string[] = [];
     lines.push(`Country: ${country} (${code})`);
 
-    if (score) {
+    if (aaiScore) {
+      lines.push(`AAI: ${aaiScore.score}/100 (${aaiScore.level}), trend=${aaiScore.trend}`);
+      lines.push(`Sightings 90d: ${aaiScore.sightingDensity ?? 0}, Institutional activity: ${aaiScore.institutionalActivity ?? 0}`);
+    } else if (score) {
       lines.push(`CII: ${score.score}/100 (${score.level}), trend=${score.trend}, 24h_change=${score.change24h}`);
       lines.push(`CII components: unrest=${Math.round(score.components.unrest)}, conflict=${Math.round(score.components.conflict)}, security=${Math.round(score.components.security)}, information=${Math.round(score.components.information)}`);
     }
 
-    lines.push(
-      `Signals: critical_news=${signals.criticalNews}, protests=${signals.protests}, active_strikes=${signals.activeStrikes}, military_flights=${signals.militaryFlights}, military_vessels=${signals.militaryVessels}, outages=${signals.outages}, aviation_disruptions=${signals.aviationDisruptions}, travel_advisories=${signals.travelAdvisories}, oref_sirens=${signals.orefSirens}, oref_24h=${signals.orefHistory24h}, gps_jamming_hexes=${signals.gpsJammingHexes}, ais_disruptions=${signals.aisDisruptions}, satellite_fires=${signals.satelliteFires}, temporal_anomalies=${signals.temporalAnomalies}, cyber_threats=${signals.cyberThreats}, earthquakes=${signals.earthquakes}, conflict_events=${signals.conflictEvents}`,
-    );
+    if (!aaiScore) {
+      lines.push(
+        `Signals: critical_news=${signals.criticalNews}, protests=${signals.protests}, active_strikes=${signals.activeStrikes}, military_flights=${signals.militaryFlights}, military_vessels=${signals.militaryVessels}, outages=${signals.outages}, aviation_disruptions=${signals.aviationDisruptions}, travel_advisories=${signals.travelAdvisories}, oref_sirens=${signals.orefSirens}, oref_24h=${signals.orefHistory24h}, gps_jamming_hexes=${signals.gpsJammingHexes}, ais_disruptions=${signals.aisDisruptions}, satellite_fires=${signals.satelliteFires}, temporal_anomalies=${signals.temporalAnomalies}, cyber_threats=${signals.cyberThreats}, earthquakes=${signals.earthquakes}, conflict_events=${signals.conflictEvents}`,
+      );
 
-    if (signals.travelAdvisoryMaxLevel) {
-      lines.push(`Travel advisory max level: ${signals.travelAdvisoryMaxLevel}`);
-    }
+      if (signals.travelAdvisoryMaxLevel) {
+        lines.push(`Travel advisory max level: ${signals.travelAdvisoryMaxLevel}`);
+      }
 
-    const stockIndex = typeof context.stockIndex === 'string' ? context.stockIndex : '';
-    if (stockIndex) lines.push(`Stock index: ${stockIndex}`);
+      const stockIndex = typeof context.stockIndex === 'string' ? context.stockIndex : '';
+      if (stockIndex) lines.push(`Stock index: ${stockIndex}`);
 
-    const convergenceScore = typeof context.convergenceScore === 'number' ? context.convergenceScore : null;
-    const signalTypes = Array.isArray(context.signalTypes) ? context.signalTypes as string[] : [];
-    if (convergenceScore != null || signalTypes.length > 0) {
-      lines.push(`Signal convergence: score=${convergenceScore ?? 0}, types=${signalTypes.slice(0, 8).join(', ')}`);
-    }
+      const convergenceScore = typeof context.convergenceScore === 'number' ? context.convergenceScore : null;
+      const signalTypes = Array.isArray(context.signalTypes) ? context.signalTypes as string[] : [];
+      if (convergenceScore != null || signalTypes.length > 0) {
+        lines.push(`Signal convergence: score=${convergenceScore ?? 0}, types=${signalTypes.slice(0, 8).join(', ')}`);
+      }
 
-    const regionalConvergence = Array.isArray(context.regionalConvergence) ? context.regionalConvergence as string[] : [];
-    if (regionalConvergence.length > 0) {
-      lines.push(`Regional context: ${regionalConvergence.slice(0, 3).join(' | ')}`);
+      const regionalConvergence = Array.isArray(context.regionalConvergence) ? context.regionalConvergence as string[] : [];
+      if (regionalConvergence.length > 0) {
+        lines.push(`Regional context: ${regionalConvergence.slice(0, 3).join(' | ')}`);
+      }
     }
 
     const headlines = Array.isArray(context.headlines) ? context.headlines as string[] : [];
@@ -756,6 +845,86 @@ export class CountryIntelManager implements AppModule {
       nearestBases: nearbyBases,
       foreignPresence: foreignFlights > 0 || foreignVessels > 0,
     };
+  }
+
+  /** Compute time buckets and shape counts from map-layer UAP sightings (occurred date = timestamp). Source of truth for Active Signals and Shapes. */
+  private computeUapRegionStatsFromMapLayer(
+    code: string,
+    regionId: string,
+  ): {
+    buckets: { sightings1d: number; sightings7d: number; sightings30d: number; sightings90d: number; sightings180d: number; sightings365d: number };
+    shapeCounts: Record<string, number>;
+    recentSightings: Array<{ timestamp: number; shape: string; description?: string }>;
+  } {
+    const list = this.ctx.intelligenceCache.uapSightings ?? [];
+    const hasGeometry = hasCountryGeometry(code) || !!CountryIntelManager.COUNTRY_BOUNDS[code];
+    const inRegion = (s: { lat: number; lon: number; country?: string }) => {
+      const c = (s.country ?? '').trim();
+      const normalized = c ? (COUNTRY_TO_REGION[c] ?? c) : '';
+      if (normalized && normalized === regionId) return true;
+      return hasGeometry && this.isInCountry(s.lat, s.lon, code);
+    };
+    const regionSightings = list.filter((s) => s.lat != null && s.lon != null && inRegion(s));
+    const nowSec = Math.floor(Date.now() / 1000);
+    const buckets = { sightings1d: 0, sightings7d: 0, sightings30d: 0, sightings90d: 0, sightings180d: 0, sightings365d: 0 };
+    const dayToKey = {
+      1: 'sightings1d',
+      7: 'sightings7d',
+      30: 'sightings30d',
+      90: 'sightings90d',
+      180: 'sightings180d',
+      365: 'sightings365d',
+    } as const;
+    const days = [1, 7, 30, 90, 180, 365] as const;
+    const shapeCounts: Record<string, number> = {};
+    for (const s of regionSightings) {
+      const ts = s.timestamp ?? 0;
+      for (const d of days) {
+        if (ts >= nowSec - d * 86400) {
+          const k = dayToKey[d];
+          buckets[k] = buckets[k] + 1;
+        }
+      }
+      const shape = (s.shape ?? '').trim() || 'Unknown';
+      shapeCounts[shape] = (shapeCounts[shape] ?? 0) + 1;
+    }
+    const since7d = nowSec - 7 * 86400;
+    const recentSightings = regionSightings
+      .filter((s) => (s.timestamp ?? 0) >= since7d)
+      .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0))
+      .slice(0, 20)
+      .map((s) => ({ timestamp: s.timestamp ?? 0, shape: (s.shape ?? '').trim() || 'Unknown', description: s.description }));
+    return { buckets, shapeCounts, recentSightings };
+  }
+
+  private async fetchAndUpdateSensorCoverage(code: string): Promise<void> {
+    const centroid = getCountryCentroid(code, CountryIntelManager.COUNTRY_BOUNDS);
+    if (!centroid) {
+      this.ctx.countryBriefPage?.updateSensorCoverage?.([]);
+      return;
+    }
+    try {
+      const url = toApiUrl('/api/uap/v1/list-uap-sensor-stations');
+      const res = await fetch(url, { signal: this.ctx.countryBriefPage?.signal, cache: 'no-store' });
+      if (!res.ok) {
+        this.ctx.countryBriefPage?.updateSensorCoverage?.([]);
+        return;
+      }
+      const data = (await res.json()) as { stations?: Array<{ name: string; lat: number; lon: number }> };
+      const stations = data.stations ?? [];
+      const MAX_KM = 5000;
+      const nearby = stations
+        .map((s) => ({ name: s.name, distanceKm: haversineDistanceKm(centroid.lat, centroid.lon, s.lat, s.lon) }))
+        .filter((s) => s.distanceKm <= MAX_KM)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+      if (this.ctx.countryBriefPage?.getCode() === code) {
+        this.ctx.countryBriefPage.updateSensorCoverage?.(nearby);
+      }
+    } catch {
+      if (this.ctx.countryBriefPage?.getCode() === code) {
+        this.ctx.countryBriefPage?.updateSensorCoverage?.([]);
+      }
+    }
   }
 
   private buildEconomicIndicators(

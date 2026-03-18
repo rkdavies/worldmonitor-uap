@@ -5,6 +5,7 @@ import type {
   GetTradeFlowsResponse,
   GetTradeBarriersResponse,
   GetCustomsRevenueResponse,
+  CustomsRevenueMonth,
 } from '@/services/trade';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
@@ -261,12 +262,12 @@ export class TradePolicyPanel extends Panel {
     const latest = months[months.length - 1]!;
     const latestFy = latest.fiscalYear;
 
-    const currentFyMonths = months.filter(m => m.fiscalYear === latestFy);
+    const currentFyMonths = months.filter((m: CustomsRevenueMonth) => m.fiscalYear === latestFy);
     const currentFyCount = currentFyMonths.length;
-    const priorFyAll = months.filter(m => m.fiscalYear === latestFy - 1);
+    const priorFyAll = months.filter((m: CustomsRevenueMonth) => m.fiscalYear === latestFy - 1);
     const priorFyMonths = priorFyAll.slice(0, currentFyCount);
-    const currentFytd = currentFyMonths.reduce((s, m) => s + m.monthlyAmountBillions, 0);
-    const priorFytd = priorFyMonths.reduce((s, m) => s + m.monthlyAmountBillions, 0);
+    const currentFytd = currentFyMonths.reduce((s: number, m: CustomsRevenueMonth) => s + m.monthlyAmountBillions, 0);
+    const priorFytd = priorFyMonths.reduce((s: number, m: CustomsRevenueMonth) => s + m.monthlyAmountBillions, 0);
     const yoyChange = priorFytd > 0 ? ((currentFytd - priorFytd) / priorFytd) * 100 : 0;
     const changeClass = yoyChange >= 0 ? 'change-negative' : 'change-positive';
     const arrow = yoyChange >= 0 ? '\u25B2' : '\u25BC';

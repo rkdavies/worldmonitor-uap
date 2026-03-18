@@ -59,3 +59,6 @@ export * from './MilitaryCorrelationPanel';
 export * from './EscalationCorrelationPanel';
 export * from './EconomicCorrelationPanel';
 export * from './DisasterCorrelationPanel';
+export { UapAaiPanel } from './UapAaiPanel';
+export { UapSensorsPanel } from './UapSensorsPanel';
+export { UapLegislativePanel } from './UapLegislativePanel';

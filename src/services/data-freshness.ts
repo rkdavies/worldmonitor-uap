@@ -77,6 +77,9 @@ const SOURCE_METADATA: Record<DataSourceId, { name: string; requiredForRisk: boo
   gpsjam: { name: 'GPS/GNSS Interference', requiredForRisk: false, panelId: 'map' },
   uap_sightings: { name: 'UAP Sightings', requiredForRisk: false, panelId: 'uap-sightings' },
   uap_institutional: { name: 'UAP Institutional', requiredForRisk: false, panelId: 'uap-institutional' },
+  opensky_traffic: { name: 'Live ADS-B (civil)', requiredForRisk: false, panelId: 'map' },
+  aviation_delays: { name: 'Airport delays & NOTAMs', requiredForRisk: false, panelId: 'map' },
+  treasury_revenue: { name: 'US Customs Revenue (Treasury)', requiredForRisk: false, panelId: 'trade-policy' },
 };
 
 class DataFreshnessTracker {
@@ -339,6 +342,9 @@ const INTELLIGENCE_GAP_MESSAGES: Record<DataSourceId, string> = {
   gpsjam: 'GPS/GNSS interference data unavailable—jamming zones undetected',
   uap_sightings: 'UAP sighting reports unavailable—NUFORC data not loading',
   uap_institutional: 'UAP institutional reports unavailable',
+  treasury_revenue: 'US customs revenue data unavailable—Treasury MTS feed not loading',
+  opensky_traffic: 'Live civil aircraft positions unavailable—OpenSky ADS-B feed offline or rate-limited',
+  aviation_delays: 'Airport delay and NOTAM markers may be incomplete—aviation disruption feeds unavailable',
 };
 
 /**

@@ -399,8 +399,8 @@ export class MapComponent {
       'positiveEvents', 'kindness', 'happiness', 'speciesRecovery', 'renewableInstallations',
     ];
     const uapLayers: (keyof MapLayers)[] = [
-      'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots',
-      'nuclear', 'bases', 'military', 'conflicts', 'weather', 'dayNight',
+      'uapSightings', 'uapSensorStations', 'uapHistoricalHotspots', 'uapReportingContext',
+      'nuclear', 'bases', 'military', 'flights', 'conflicts', 'weather', 'dayNight',
     ];
     const layers = SITE_VARIANT === 'tech' ? techLayers : SITE_VARIANT === 'finance' ? financeLayers : SITE_VARIANT === 'happy' ? happyLayers : SITE_VARIANT === 'uap' ? uapLayers : fullLayers;
     const layerLabelKeys: Partial<Record<keyof MapLayers, string>> = {
@@ -436,6 +436,7 @@ export class MapComponent {
       uapSightings: 'components.deckgl.layers.uapSightings',
       uapSensorStations: 'components.deckgl.layers.uapSensorStations',
       uapHistoricalHotspots: 'components.deckgl.layers.uapHistoricalHotspots',
+      uapReportingContext: 'components.deckgl.layers.uapReportingContext',
     };
     const getLayerLabel = (layer: keyof MapLayers): string => {
       if (layer === 'sanctions') return t('components.deckgl.layerHelp.labels.sanctions');

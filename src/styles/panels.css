@@ -146,6 +146,197 @@
 }
 
 /* ----------------------------------------------------------
+   UAP Anomalous Activity Index Panel
+   ---------------------------------------------------------- */
+.uap-aai-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.uap-aai-intro {
+  margin: 0 0 4px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.uap-aai-intro strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.uap-aai-card {
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.uap-aai-card:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.uap-aai-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.uap-aai-field-score {
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.uap-aai-field-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.uap-aai-region {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.uap-aai-region--hint {
+  cursor: help;
+  border-bottom: 1px dotted var(--text-faint);
+}
+
+.uap-aai-score {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.uap-aai-score-max {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.uap-aai-score.uap-aai-level-low {
+  color: var(--semantic-normal);
+}
+
+.uap-aai-score.uap-aai-level-moderate {
+  color: var(--semantic-elevated);
+}
+
+.uap-aai-score.uap-aai-level-elevated {
+  color: var(--semantic-high);
+}
+
+.uap-aai-score.uap-aai-level-high {
+  color: var(--semantic-critical);
+}
+
+.uap-aai-card-meta--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.65rem;
+  align-items: baseline;
+}
+
+.uap-aai-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.uap-aai-meta-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.uap-aai-meta-k {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.uap-aai-meta-sightings .uap-aai-density {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.uap-aai-level-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.uap-aai-level-badge.uap-aai-level-low {
+  color: var(--semantic-normal);
+  background: color-mix(in srgb, var(--semantic-normal) 14%, transparent);
+  border-color: color-mix(in srgb, var(--semantic-normal) 40%, transparent);
+}
+
+.uap-aai-level-badge.uap-aai-level-moderate {
+  color: var(--semantic-elevated);
+  background: color-mix(in srgb, var(--semantic-elevated) 14%, transparent);
+  border-color: color-mix(in srgb, var(--semantic-elevated) 40%, transparent);
+}
+
+.uap-aai-level-badge.uap-aai-level-elevated {
+  color: var(--semantic-high);
+  background: color-mix(in srgb, var(--semantic-high) 14%, transparent);
+  border-color: color-mix(in srgb, var(--semantic-high) 40%, transparent);
+}
+
+.uap-aai-level-badge.uap-aai-level-high {
+  color: var(--semantic-critical);
+  background: color-mix(in srgb, var(--semantic-critical) 14%, transparent);
+  border-color: color-mix(in srgb, var(--semantic-critical) 40%, transparent);
+}
+
+.uap-aai-trend-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 18px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--overlay-subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.uap-aai-density {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------
    Population Exposure Panel
    ---------------------------------------------------------- */
 .popexp-panel-content {

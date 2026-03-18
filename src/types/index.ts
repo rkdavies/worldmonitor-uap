@@ -30,7 +30,11 @@ export type DataSourceId =
   | 'supply_chain'
   | 'security_advisories'
   | 'gpsjam'
-  | 'treasury_revenue';
+  | 'treasury_revenue'
+  | 'uap_sightings'
+  | 'uap_institutional'
+  | 'opensky_traffic'
+  | 'aviation_delays';
 
 // AppContext lives in src/app/app-context.ts because it references
 // components, services, and utils (top-level aggregate type).
@@ -632,6 +636,12 @@ export interface MapLayers {
   processingPlants: boolean;
   commodityPorts: boolean;
   webcams: boolean;
+  // UAP variant map layers
+  uapSightings: boolean;
+  uapSensorStations: boolean;
+  uapHistoricalHotspots: boolean;
+  /** Regional reporting-opportunity index (literature-based proxies; UAP variant). */
+  uapReportingContext: boolean;
 }
 
 export interface AIDataCenter {

@@ -291,6 +291,19 @@
   gap: 8px;
 }
 
+.cdp-aai-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.cdp-aai-meta .cdp-meta-item {
+  white-space: nowrap;
+}
+
 .cdp-components {
   display: flex;
   flex-direction: column;
@@ -399,6 +412,11 @@
   color: var(--semantic-elevated);
   background: color-mix(in srgb, var(--semantic-elevated) 12%, transparent);
   border-color: color-mix(in srgb, var(--semantic-elevated) 35%, transparent);
+}
+
+.cdp-signal-chip.chip-uap {
+  color: var(--semantic-elevated);
+  background: color-mix(in srgb, var(--semantic-elevated) 12%, transparent);
 }
 
 .cdp-signal-chip.chip-stock {
@@ -622,6 +640,43 @@
 .cdp-base-distance {
   color: var(--text-faint);
   font-size: 10px;
+}
+
+.cdp-shape-list,
+.cdp-recent-sightings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cdp-shape-item,
+.cdp-recent-sighting-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.cdp-shape-count,
+.cdp-recent-sighting-date {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.cdp-recent-sighting-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.cdp-institutional-activity {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .cdp-trend-token {

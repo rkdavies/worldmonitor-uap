@@ -1160,6 +1160,13 @@ export class MapPopup {
     const onGroundBadge = pos.onGround ? 'low' : 'elevated';
     const statusLabel = pos.onGround ? t('popups.aircraft.ground') : t('popups.aircraft.airborne');
     const altDisplay = pos.altitudeFt > 0 ? `FL${Math.round(pos.altitudeFt / 100)} (${pos.altitudeFt.toLocaleString()} ft)` : t('popups.aircraft.ground');
+    const uavRow =
+      pos.emitterCategory === 14
+        ? `<div class="popup-stat">
+            <span class="stat-label">${t('popups.aircraft.adsbUav')}</span>
+            <span class="stat-value">&#10003;</span>
+          </div>`
+        : '';
 
     return `
       <div class="popup-header aircraft">
@@ -1191,6 +1198,7 @@ export class MapPopup {
             <span class="stat-label">${t('popups.source')}</span>
             <span class="stat-value">${escapeHtml(pos.source)}</span>
           </div>
+          ${uavRow}
           <div class="popup-stat">
             <span class="stat-label">${t('popups.updated')}</span>
             <span class="stat-value">${pos.observedAt.toLocaleTimeString()}</span>

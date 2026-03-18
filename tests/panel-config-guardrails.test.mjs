@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const panelLayoutSrc = readFileSync(resolve(__dirname, '../src/app/panel-layout.ts'), 'utf-8');
 
-const VARIANT_FILES = ['full', 'tech', 'finance', 'commodity', 'happy'];
+const VARIANT_FILES = ['full', 'tech', 'finance', 'commodity', 'happy', 'uap'];
 
 function parsePanelKeys(variant) {
   const src = readFileSync(resolve(__dirname, '../src/config/panels.ts'), 'utf-8');
@@ -81,12 +81,16 @@ describe('panel-config guardrails', () => {
     }
 
     const keys = [...allKeys.keys()];
+    /** Intentional sibling panel ids (not typos). */
+    const typoAllow = new Set(['live-news|live-news-2']);
     const typos = [];
     for (let i = 0; i < keys.length; i++) {
       for (let j = i + 1; j < keys.length; j++) {
         const minLen = Math.min(keys[i].length, keys[j].length);
         if (minLen < 5) continue;
         if (levenshtein(keys[i], keys[j]) <= 2 && keys[i] !== keys[j]) {
+          const pair = [keys[i], keys[j]].sort().join('|');
+          if (typoAllow.has(pair)) continue;
           typos.push(`"${keys[i]}" ↔ "${keys[j]}"`);
         }
       }

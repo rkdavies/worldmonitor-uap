@@ -80,6 +80,7 @@ const VARIANT_DEFAULTS = {
   finance:   { desktop: 'FINANCE_MAP_LAYERS',    mobile: 'FINANCE_MOBILE_MAP_LAYERS' },
   happy:     { desktop: 'HAPPY_MAP_LAYERS',      mobile: 'HAPPY_MOBILE_MAP_LAYERS' },
   commodity: { desktop: 'COMMODITY_MAP_LAYERS',  mobile: 'COMMODITY_MOBILE_MAP_LAYERS' },
+  uap:       { desktop: 'UAP_MAP_LAYERS',        mobile: 'UAP_MOBILE_MAP_LAYERS' },
 };
 
 describe('variant layer guardrail', () => {

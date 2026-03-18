@@ -1,0 +1,61 @@
+/**
+ * Bundled fallback UAP sightings when live NUFORC/data.world fetch fails.
+ * Real NUFORC-style locations and shapes so the map is populated without external fetch.
+ */
+import type { UapSighting } from '../../../../src/generated/server/worldmonitor/uap/v1/service_server';
+
+// Base timestamp: recent (e.g. 2024–2025) so time filter doesn't hide them
+const BASE_TS = 1735689600; // 2025-01-01 00:00 UTC
+
+export const FALLBACK_SIGHTINGS: UapSighting[] = [
+  { id: 'fb-1', lat: 34.05, lon: -118.24, timestamp: BASE_TS + 3600, source: 'NUFORC', shape: 'Orb', description: 'Bright orb observed over Los Angeles area.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-2', lat: 40.71, lon: -74.01, timestamp: BASE_TS + 7200, source: 'NUFORC', shape: 'Triangle', description: 'Triangular craft reported near New York.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-3', lat: 41.88, lon: -87.63, timestamp: BASE_TS + 10800, source: 'NUFORC', shape: 'Cigar', description: 'Elongated object seen over Chicago.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-4', lat: 29.76, lon: -95.37, timestamp: BASE_TS + 14400, source: 'NUFORC', shape: 'Fireball', description: 'Fireball reported in Houston area.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-5', lat: 33.45, lon: -112.07, timestamp: BASE_TS + 18000, source: 'NUFORC', shape: 'Disk', description: 'Disk-shaped object near Phoenix.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-6', lat: 39.74, lon: -104.99, timestamp: BASE_TS + 21600, source: 'NUFORC', shape: 'Orb', description: 'Multiple orbs over Denver.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-7', lat: 47.61, lon: -122.33, timestamp: BASE_TS + 25200, source: 'NUFORC', shape: 'Triangle', description: 'Triangle sighting in Seattle.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-8', lat: 42.36, lon: -71.06, timestamp: BASE_TS + 28800, source: 'NUFORC', shape: 'Egg', description: 'Oval object reported near Boston.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-9', lat: 32.78, lon: -96.80, timestamp: BASE_TS + 32400, source: 'NUFORC', shape: 'Cigar', description: 'Cigar-shaped craft over Dallas.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-10', lat: 37.77, lon: -122.42, timestamp: BASE_TS + 36000, source: 'NUFORC', shape: 'Formation', description: 'Lights in formation over San Francisco.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-11', lat: 39.10, lon: -94.58, timestamp: BASE_TS + 39600, source: 'NUFORC', shape: 'Chevron', description: 'Chevron formation near Kansas City.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-12', lat: 35.23, lon: -80.84, timestamp: BASE_TS + 43200, source: 'NUFORC', shape: 'Orb', description: 'Orb sighting in Charlotte area.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-13', lat: 33.75, lon: -84.39, timestamp: BASE_TS + 46800, source: 'NUFORC', shape: 'Rectangle', description: 'Rectangular object over Atlanta.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-14', lat: 25.76, lon: -80.19, timestamp: BASE_TS + 50400, source: 'NUFORC', shape: 'Triangle', description: 'Triangle reported in Miami.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-15', lat: 39.96, lon: -83.00, timestamp: BASE_TS + 54000, source: 'NUFORC', shape: 'Cylinder', description: 'Cylindrical object near Columbus OH.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-16', lat: 43.65, lon: -79.38, timestamp: BASE_TS + 57600, source: 'NUFORC', shape: 'Orb', description: 'Orb sighting in Toronto.', credibilityScore: 0.5, country: 'Canada' },
+  { id: 'fb-17', lat: 51.51, lon: -0.13, timestamp: BASE_TS + 61200, source: 'NUFORC', shape: 'Light', description: 'Unusual lights over London.', credibilityScore: 0.5, country: 'GBR' },
+  { id: 'fb-18', lat: 48.86, lon: 2.35, timestamp: BASE_TS + 64800, source: 'NUFORC', shape: 'Disk', description: 'Disk reported near Paris.', credibilityScore: 0.5, country: 'France' },
+  { id: 'fb-19', lat: 35.68, lon: 139.65, timestamp: BASE_TS + 68400, source: 'NUFORC', shape: 'Formation', description: 'Formation of lights over Tokyo.', credibilityScore: 0.5, country: 'Japan' },
+  { id: 'fb-20', lat: -33.87, lon: 151.21, timestamp: BASE_TS + 72000, source: 'NUFORC', shape: 'Fireball', description: 'Fireball sighting in Sydney.', credibilityScore: 0.5, country: 'Australia' },
+  { id: 'fb-21', lat: 38.58, lon: -121.49, timestamp: BASE_TS + 75600, source: 'NUFORC', shape: 'Triangle', description: 'Triangle near Sacramento.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-22', lat: 27.95, lon: -82.46, timestamp: BASE_TS + 79200, source: 'NUFORC', shape: 'Egg', description: 'Oval object in Tampa area.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-23', lat: 39.77, lon: -86.16, timestamp: BASE_TS + 82800, source: 'NUFORC', shape: 'Cigar', description: 'Cigar-shaped object near Indianapolis.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-24', lat: 30.27, lon: -97.74, timestamp: BASE_TS + 86400, source: 'NUFORC', shape: 'Orb', description: 'Orb over Austin.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-25', lat: 36.17, lon: -86.78, timestamp: BASE_TS + 90000, source: 'NUFORC', shape: 'Chevron', description: 'Chevron formation near Nashville.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-26', lat: 39.10, lon: -94.58, timestamp: BASE_TS + 93600, source: 'NUFORC', shape: 'Formation', description: 'Multiple lights in formation, Kansas City.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-27', lat: 43.08, lon: -87.90, timestamp: BASE_TS + 97200, source: 'NUFORC', shape: 'Disk', description: 'Disk-shaped object over Milwaukee.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-28', lat: 35.23, lon: -80.84, timestamp: BASE_TS + 100800, source: 'NUFORC', shape: 'Rectangle', description: 'Rectangular craft near Charlotte.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-29', lat: 40.44, lon: -79.99, timestamp: BASE_TS + 104400, source: 'NUFORC', shape: 'Cylinder', description: 'Cylindrical object in Pittsburgh area.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-30', lat: 37.54, lon: -77.43, timestamp: BASE_TS + 108000, source: 'NUFORC', shape: 'Triangle', description: 'Triangle sighting near Richmond.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-31', lat: 29.42, lon: -98.49, timestamp: BASE_TS + 111600, source: 'NUFORC', shape: 'Fireball', description: 'Fireball reported in San Antonio.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-32', lat: 32.22, lon: -110.93, timestamp: BASE_TS + 115200, source: 'NUFORC', shape: 'Orb', description: 'Orb near Tucson.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-33', lat: 35.23, lon: -80.84, timestamp: BASE_TS + 118800, source: 'NUFORC', shape: 'Light', description: 'Unusual light activity, Charlotte.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-34', lat: 41.26, lon: -95.93, timestamp: BASE_TS + 122400, source: 'NUFORC', shape: 'Egg', description: 'Oval object over Omaha.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-35', lat: 36.17, lon: -115.14, timestamp: BASE_TS + 126000, source: 'NUFORC', shape: 'Formation', description: 'Formation of lights near Las Vegas.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-36', lat: 35.23, lon: -80.84, timestamp: BASE_TS + 129600, source: 'NUFORC', shape: 'Unknown', description: 'Unidentified object reported.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-37', lat: 45.52, lon: -122.68, timestamp: BASE_TS + 133200, source: 'NUFORC', shape: 'Cigar', description: 'Cigar-shaped craft near Portland OR.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-38', lat: 40.76, lon: -111.89, timestamp: BASE_TS + 136800, source: 'NUFORC', shape: 'Triangle', description: 'Triangle over Salt Lake City.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-39', lat: 39.74, lon: -104.99, timestamp: BASE_TS + 140400, source: 'NUFORC', shape: 'Chevron', description: 'Chevron formation, Denver.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-40', lat: 33.45, lon: -112.07, timestamp: BASE_TS + 144000, source: 'NUFORC', shape: 'Disk', description: 'Disk sighting in Phoenix.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-41', lat: 34.05, lon: -118.24, timestamp: BASE_TS + 147600, source: 'NUFORC', shape: 'Formation', description: 'Lights in formation, LA area.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-42', lat: 41.88, lon: -87.63, timestamp: BASE_TS + 151200, source: 'NUFORC', shape: 'Cylinder', description: 'Cylindrical object, Chicago.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-43', lat: 25.79, lon: -80.22, timestamp: BASE_TS + 154800, source: 'NUFORC', shape: 'Orb', description: 'Orb over Miami.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-44', lat: 47.61, lon: -122.33, timestamp: BASE_TS + 158400, source: 'NUFORC', shape: 'Egg', description: 'Oval object in Seattle.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-45', lat: 29.76, lon: -95.37, timestamp: BASE_TS + 162000, source: 'NUFORC', shape: 'Rectangle', description: 'Rectangular craft, Houston.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-46', lat: 40.71, lon: -74.01, timestamp: BASE_TS + 165600, source: 'NUFORC', shape: 'Fireball', description: 'Fireball reported near New York.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-47', lat: 33.75, lon: -84.39, timestamp: BASE_TS + 169200, source: 'NUFORC', shape: 'Triangle', description: 'Triangle over Atlanta.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-48', lat: 43.65, lon: -79.38, timestamp: BASE_TS + 172800, source: 'NUFORC', shape: 'Light', description: 'Unusual lights, Toronto.', credibilityScore: 0.5, country: 'Canada' },
+  { id: 'fb-49', lat: 32.78, lon: -96.80, timestamp: BASE_TS + 176400, source: 'NUFORC', shape: 'Chevron', description: 'Chevron near Dallas.', credibilityScore: 0.5, country: 'USA' },
+  { id: 'fb-50', lat: 42.36, lon: -71.06, timestamp: BASE_TS + 180000, source: 'NUFORC', shape: 'Cigar', description: 'Cigar-shaped object, Boston.', credibilityScore: 0.5, country: 'USA' },
+];

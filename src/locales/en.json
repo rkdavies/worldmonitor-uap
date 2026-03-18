@@ -71,6 +71,26 @@
       "stable": "Stable"
     },
     "militaryActivity": "Military Activity",
+    "recentSightings": "Recent sightings",
+    "sensorCoverage": "Sensor coverage",
+    "sightingShapes": "Sighting shapes",
+    "institutionalActivity": "Institutional activity",
+    "loadingSensorCoverage": "Loading sensor coverage…",
+    "loadingInstitutional": "Loading institutional activity…",
+    "loadingSightingShapes": "Loading sighting shapes…",
+    "noSensorStationsNearby": "No UAP sensor stations within 5000 km.",
+    "noSightingShapes": "No shape data for this region.",
+    "noRecentSightings": "No recent sightings in the last 7 days.",
+    "institutionalActivityScore": "Institutional activity score: {{score}}",
+    "noRegionalInstitutional": "No regional institutional reports.",
+    "sightingsPeriods": {
+      "sightings1d": "1 Day",
+      "sightings7d": "1 Week",
+      "sightings1m": "1 Month",
+      "sightings3m": "3 Month",
+      "sightings6m": "6 Month",
+      "sightings1y": "1 Year"
+    },
     "economicIndicators": "Economic Indicators",
     "ownFlights": "Own Flights",
     "foreignFlights": "Foreign Flights",
@@ -114,6 +134,9 @@
     },
     "fallback": {
       "instabilityIndex": "**Instability Index: {{score}}/100** ({{level}}, {{trend}})",
+      "aaiIndex": "**Anomalous Activity Index: {{score}}/100** ({{level}}, {{trend}})",
+      "sightings90d": "Sightings (90d): {{count}}",
+      "institutionalActivity": "Institutional activity: {{count}}",
       "protestsDetected": "{{count}} active protests detected",
       "aircraftTracked": "{{count}} military aircraft tracked",
       "vesselsTracked": "{{count}} military vessels tracked",
@@ -222,7 +245,7 @@
   },
   "panels": {
     "liveNews": "Live News",
-    "liveNews2": "Live News 2",
+    "liveNews2": "Skinwalker Ranch",
     "markets": "Markets",
     "map": "Global Situation",
     "techMap": "Global Tech",
@@ -1047,6 +1070,8 @@
       "layerWarningOk": "Got it",
       "layersTitle": "Layers",
       "layerSearch": "Search layers...",
+      "uavAdsbFilter": "UAV ADS-B only",
+      "uavAdsbFilterHint": "OpenSky category 14 emitters in view (not UAP reports).",
       "timeAll": "All",
       "views": {
         "global": "Global",
@@ -1106,7 +1131,8 @@
         "renewableInstallations": "Clean Energy",
         "uapSightings": "UAP Sightings",
         "uapSensorStations": "Sensor Stations",
-        "uapHistoricalHotspots": "Historical Hotspots"
+        "uapHistoricalHotspots": "Historical Hotspots",
+        "uapReportingContext": "Reporting context (AAI)"
       },
       "tooltip": {
         "earthquake": "Earthquake",
@@ -1195,7 +1221,7 @@
           "infraPipelinesFull": "Oil/gas pipelines (Nord Stream, TAPI, etc.)",
           "infraDatacentersFull": "AI compute clusters >=10,000 GPUs only",
           "transportShipping": "Live vessel tracking via AIS (ship positions)",
-          "transportDelays": "Airport delays, ground stops, and NOTAM closures",
+          "transportDelays": "Airport delays & NOTAM closures (FAA / EUROCONTROL). Live aircraft positions from OpenSky ADS-B in the current map view.",
           "naturalEventsFull": "Earthquakes (USGS) + storms, fires, volcanoes, floods (NASA EONET)",
           "firesFull": "Active wildfires and fire perimeters (NASA FIRMS)",
           "climateAnomalies": "Temperature and precipitation anomalies",
@@ -1685,6 +1711,21 @@
     "commodities": {
       "infoTooltip": "<strong>Commodities</strong> Key commodity prices including gold, silver, oil, natural gas, copper, and agricultural products. Sparklines show recent price trend."
     },
+    "uapAai": {
+      "listIntro": "Each row is one region. <strong>Adjusted AAI</strong> accounts for reporting opportunity (sky visibility, air traffic, military activity). <strong>Raw</strong> = unadjusted sighting density.",
+      "regionLabel": "Region",
+      "scoreLabel": "Adjusted AAI",
+      "rawScoreLabel": "Raw density",
+      "contextLabel": "Report. context",
+      "residualLabel": "Residual",
+      "levelLabel": "Level",
+      "trendLabel": "Trend",
+      "sightingsLabel": "Sightings (90d)",
+      "contextShort": "Context {{n}}/100",
+      "regionUnlisted": "Unlisted (no country)",
+      "regionUnlistedHint": "These reports are missing a country field in the feed—they are grouped together, not tied to a specific nation.",
+      "infoTooltip": "<strong>Anomalous Activity Index (AAI)</strong> combines reported sighting volume with <em>observation context</em> (Medina et al., Sci Rep 2023): regions where people and sensors more often see the sky and aircraft tend to file more reports.<ul><li><strong>Adjusted score</strong> — Sightings relative to expected reporting opportunity; level bands use this score.</li><li><strong>Raw density</strong> — Pure 90-day count vs other regions (uncorrected).</li><li><strong>Reporting context</strong> — 0–100 from proxies for dark skies, airport/air traffic, military training (not proof of anomalous activity).</li><li><strong>Residual</strong> — Peer-normalized activity after weighting by context.</li></ul>This is OSINT from public reports, not a scientific claim about UAP origin."
+    },
     "panel": {
       "showMethodologyInfo": "Show methodology info",
       "dragToResize": "Drag to resize (double-click to reset)",
@@ -1765,6 +1806,7 @@
       "customChannel": "Custom channel",
       "regionAll": "All",
       "regionNorthAmerica": "North America",
+      "regionNASA": "NASA",
       "regionEurope": "Europe",
       "regionLatinAmerica": "Latin America",
       "regionAsia": "Asia",
@@ -1775,7 +1817,15 @@
       "channelNotFound": "YouTube channel not found",
       "verifying": "Verifying…",
       "hlsUrl": "HLS Stream URL (optional)",
-      "invalidHlsUrl": "Enter a valid HLS stream URL (.m3u8)"
+      "invalidHlsUrl": "Enter a valid HLS stream URL (.m3u8)",
+      "skinwalkerGridView": "Dual view (stacked)",
+      "skinwalkerSingleView": "Single view",
+      "skinwalkerLoadGrid": "Load dual view",
+      "skinwalkerGridCap": "Showing top {{n}} feeds stacked (reorder in channel settings).",
+      "skinwalkerOpenSingle": "Open",
+      "skinwalkerPaused": "Streams paused (idle)",
+      "skinwalkerNotVisible": "Scroll this panel into view to load streams.",
+      "skinwalkerNoChannels": "Add channels in settings."
     },
     "map": {
       "showMap": "Show Map",
@@ -1871,7 +1921,8 @@
       "heading": "Heading",
       "position": "Position",
       "ground": "On Ground",
-      "airborne": "Airborne"
+      "airborne": "Airborne",
+      "adsbUav": "ADS-B UAV emitter (OpenSky cat. 14)"
     },
     "apt": {
       "description": "Advanced Persistent Threat group with state-level capabilities. Known for sophisticated cyber operations targeting critical infrastructure, government, and defense sectors."

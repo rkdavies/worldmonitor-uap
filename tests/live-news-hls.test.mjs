@@ -56,8 +56,9 @@ describe('DIRECT_HLS_MAP integrity', () => {
       const hasFallback = /fallbackVideoId:\s*'[^']+'/.test(channelDef[0]);
       const hasHlsUrl = /hlsUrl:\s*'[^']+'/.test(channelDef[0]);
       const hasHandle = /handle:\s*'[^']+'/.test(channelDef[0]);
-      assert.ok(hasFallback || hasHlsUrl || hasHandle,
-        `Channel '${id}' in DIRECT_HLS_MAP lacks fallbackVideoId, hlsUrl, and handle`);
+      const hasChannelId = /channelId:\s*'UC[^']+'/.test(channelDef[0]);
+      assert.ok(hasFallback || hasHlsUrl || hasHandle || hasChannelId,
+        `Channel '${id}' in DIRECT_HLS_MAP lacks fallbackVideoId, hlsUrl, handle, and channelId`);
     }
   });
 
@@ -239,6 +240,21 @@ describe('YouTube API hlsManifestUrl extraction', () => {
   it('includes hlsUrl in response JSON', () => {
     assert.match(youtubeApi, /JSON\.stringify\(\{[^}]*hlsUrl/,
       'Response must include hlsUrl field');
+  });
+});
+
+describe('YouTube live channel ID (UC…) support', () => {
+  it('edge youtube/live uses /channel/UC…/live for channel IDs', () => {
+    assert.match(youtubeApi, /channel\/\$\{trimmed\}\/live/,
+      'Must fetch youtube.com/channel/UC…/live for UC ids');
+    assert.match(youtubeApi, /UC\[a-zA-Z0-9_-\]\{22\}/,
+      'Must detect 22-char UC channel ids');
+  });
+
+  it('relay youtube-live handler supports UC channel ids', () => {
+    const relay = readSrc('scripts/ais-relay.cjs');
+    assert.match(relay, /channel\/\$\{trimmed\}\/live/,
+      'Relay must use channel/UC…/live URL');
   });
 });
 

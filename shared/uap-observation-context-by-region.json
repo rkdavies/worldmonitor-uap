@@ -1,0 +1,267 @@
+{
+  "USA": {
+    "lat": 39.74,
+    "lon": -104.99,
+    "sky": 78,
+    "airTraffic": 95,
+    "militaryTraining": 82,
+    "mapAnchors": [
+      { "lat": 34.05, "lon": -118.24, "label": "West" },
+      { "lat": 47.61, "lon": -122.33, "label": "Pacific NW" },
+      { "lat": 39.74, "lon": -104.99, "label": "Mountain" },
+      { "lat": 32.78, "lon": -96.8, "label": "South Central" },
+      { "lat": 41.88, "lon": -87.63, "label": "Great Lakes" },
+      { "lat": 40.71, "lon": -74.01, "label": "Northeast" },
+      { "lat": 33.75, "lon": -84.39, "label": "Southeast" }
+    ]
+  },
+  "Canada": {
+    "lat": 43.65,
+    "lon": -79.38,
+    "sky": 85,
+    "airTraffic": 70,
+    "militaryTraining": 48,
+    "mapAnchors": [
+      { "lat": 49.28, "lon": -123.12, "label": "Pacific" },
+      { "lat": 51.05, "lon": -114.07, "label": "Prairies" },
+      { "lat": 43.65, "lon": -79.38, "label": "Ontario" },
+      { "lat": 45.5, "lon": -73.57, "label": "Quebec" },
+      { "lat": 44.65, "lon": -63.58, "label": "Atlantic" }
+    ]
+  },
+  "Australia": {
+    "lat": -33.87,
+    "lon": 151.21,
+    "sky": 88,
+    "airTraffic": 64,
+    "militaryTraining": 38,
+    "mapAnchors": [
+      { "lat": -31.95, "lon": 115.86, "label": "West" },
+      { "lat": -34.93, "lon": 138.6, "label": "South" },
+      { "lat": -37.81, "lon": 144.96, "label": "Southeast" },
+      { "lat": -33.87, "lon": 151.21, "label": "East" },
+      { "lat": -27.47, "lon": 153.03, "label": "Queensland" }
+    ]
+  },
+  "GBR": {
+    "lat": 51.51,
+    "lon": -0.13,
+    "sky": 44,
+    "airTraffic": 49,
+    "militaryTraining": 58
+  },
+  "Germany": {
+    "lat": 52.52,
+    "lon": 13.41,
+    "sky": 38,
+    "airTraffic": 46,
+    "militaryTraining": 42
+  },
+  "France": {
+    "lat": 48.86,
+    "lon": 2.35,
+    "sky": 42,
+    "airTraffic": 57,
+    "militaryTraining": 48
+  },
+  "Mexico": {
+    "lat": 25.69,
+    "lon": -100.32,
+    "sky": 62,
+    "airTraffic": 45,
+    "militaryTraining": 35,
+    "mapAnchors": [
+      { "lat": 32.53, "lon": -117.03, "label": "Northwest" },
+      { "lat": 25.69, "lon": -100.32, "label": "Northeast" },
+      { "lat": 19.43, "lon": -99.13, "label": "Central" },
+      { "lat": 20.67, "lon": -103.35, "label": "West Central" },
+      { "lat": 18.5, "lon": -88.3, "label": "Yucatan" }
+    ]
+  },
+  "Brazil": {
+    "lat": -23.55,
+    "lon": -46.63,
+    "sky": 58,
+    "airTraffic": 58,
+    "militaryTraining": 32,
+    "mapAnchors": [
+      { "lat": -3.12, "lon": -60.02, "label": "North" },
+      { "lat": -15.78, "lon": -47.93, "label": "Central" },
+      { "lat": -23.55, "lon": -46.63, "label": "Southeast" },
+      { "lat": -22.91, "lon": -43.17, "label": "Rio" },
+      { "lat": -30.03, "lon": -51.22, "label": "South" }
+    ]
+  },
+  "Japan": {
+    "lat": 35.68,
+    "lon": 139.76,
+    "sky": 40,
+    "airTraffic": 53,
+    "militaryTraining": 55,
+    "mapAnchors": [
+      { "lat": 43.06, "lon": 141.35, "label": "Hokkaido" },
+      { "lat": 35.68, "lon": 139.76, "label": "Kanto" },
+      { "lat": 34.69, "lon": 135.5, "label": "Kansai" },
+      { "lat": 33.59, "lon": 130.4, "label": "Kyushu" }
+    ]
+  },
+  "India": {
+    "lat": 28.61,
+    "lon": 77.21,
+    "sky": 48,
+    "airTraffic": 58,
+    "militaryTraining": 52,
+    "mapAnchors": [
+      { "lat": 28.61, "lon": 77.21, "label": "North" },
+      { "lat": 19.08, "lon": 72.88, "label": "West" },
+      { "lat": 12.97, "lon": 77.59, "label": "South" },
+      { "lat": 22.57, "lon": 88.36, "label": "East" }
+    ]
+  },
+  "Spain": {
+    "lat": 40.42,
+    "lon": -3.7,
+    "sky": 55,
+    "airTraffic": 40,
+    "militaryTraining": 38
+  },
+  "Italy": {
+    "lat": 41.9,
+    "lon": 12.48,
+    "sky": 46,
+    "airTraffic": 45,
+    "militaryTraining": 40
+  },
+  "Netherlands": {
+    "lat": 52.37,
+    "lon": 4.9,
+    "sky": 28,
+    "airTraffic": 14,
+    "militaryTraining": 42
+  },
+  "Belgium": {
+    "lat": 50.85,
+    "lon": 4.35,
+    "sky": 30,
+    "airTraffic": 10,
+    "militaryTraining": 38
+  },
+  "Sweden": {
+    "lat": 59.33,
+    "lon": 18.07,
+    "sky": 72,
+    "airTraffic": 37,
+    "militaryTraining": 45
+  },
+  "South Africa": {
+    "lat": -26.2,
+    "lon": 28.04,
+    "sky": 68,
+    "airTraffic": 42,
+    "militaryTraining": 28,
+    "mapAnchors": [
+      { "lat": -33.92, "lon": 18.42, "label": "Cape" },
+      { "lat": -26.2, "lon": 28.04, "label": "Highveld" },
+      { "lat": -29.86, "lon": 31.03, "label": "East Coast" }
+    ]
+  },
+  "Argentina": {
+    "lat": -34.6,
+    "lon": -58.38,
+    "sky": 72,
+    "airTraffic": 45,
+    "militaryTraining": 30,
+    "mapAnchors": [
+      { "lat": -34.6, "lon": -58.38, "label": "Buenos Aires" },
+      { "lat": -31.42, "lon": -64.18, "label": "Central" },
+      { "lat": -32.89, "lon": -68.85, "label": "West" },
+      { "lat": -51.62, "lon": -69.22, "label": "Patagonia" }
+    ]
+  },
+  "Chile": {
+    "lat": -33.45,
+    "lon": -70.67,
+    "sky": 80,
+    "airTraffic": 30,
+    "militaryTraining": 35,
+    "mapAnchors": [
+      { "lat": -33.45, "lon": -70.67, "label": "Central" },
+      { "lat": -53.16, "lon": -70.91, "label": "South" }
+    ]
+  },
+  "New Zealand": {
+    "lat": -36.85,
+    "lon": 174.76,
+    "sky": 86,
+    "airTraffic": 33,
+    "militaryTraining": 28,
+    "mapAnchors": [
+      { "lat": -36.85, "lon": 174.76, "label": "North" },
+      { "lat": -43.53, "lon": 172.64, "label": "South" }
+    ]
+  },
+  "Ireland": {
+    "lat": 53.35,
+    "lon": -6.26,
+    "sky": 52,
+    "airTraffic": 8,
+    "militaryTraining": 22
+  },
+  "Portugal": {
+    "lat": 38.72,
+    "lon": -9.14,
+    "sky": 58,
+    "airTraffic": 29,
+    "militaryTraining": 32
+  },
+  "Poland": {
+    "lat": 52.23,
+    "lon": 21.01,
+    "sky": 48,
+    "airTraffic": 26,
+    "militaryTraining": 48
+  },
+  "Russia": {
+    "lat": 55.76,
+    "lon": 37.62,
+    "sky": 70,
+    "airTraffic": 70,
+    "militaryTraining": 78,
+    "mapAnchors": [
+      { "lat": 59.93, "lon": 30.34, "label": "Northwest" },
+      { "lat": 55.76, "lon": 37.62, "label": "Moscow" },
+      { "lat": 56.84, "lon": 60.61, "label": "Urals" },
+      { "lat": 55.01, "lon": 82.94, "label": "Siberia" },
+      { "lat": 52.29, "lon": 104.3, "label": "Lake Baikal" },
+      { "lat": 43.11, "lon": 131.88, "label": "Pacific" }
+    ]
+  },
+  "China": {
+    "lat": 39.9,
+    "lon": 116.41,
+    "sky": 42,
+    "airTraffic": 75,
+    "militaryTraining": 72,
+    "mapAnchors": [
+      { "lat": 39.9, "lon": 116.41, "label": "North" },
+      { "lat": 31.23, "lon": 121.47, "label": "East" },
+      { "lat": 23.13, "lon": 113.26, "label": "South" },
+      { "lat": 30.57, "lon": 104.07, "label": "West" },
+      { "lat": 29.56, "lon": 106.55, "label": "Upper Yangtze" }
+    ]
+  },
+  "Hungary": {
+    "lat": 47.5,
+    "lon": 19.04,
+    "sky": 50,
+    "airTraffic": 8,
+    "militaryTraining": 35
+  },
+  "Unknown": {
+    "lat": 20,
+    "lon": 0,
+    "sky": 50,
+    "airTraffic": 50,
+    "militaryTraining": 50
+  }
+}

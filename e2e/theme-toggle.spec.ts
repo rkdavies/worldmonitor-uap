@@ -8,7 +8,11 @@ import { expect, test } from '@playwright/test';
  */
 
 test.describe('theme toggle (happy variant)', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    if (process.env.VITE_VARIANT !== 'happy') {
+      testInfo.skip(true, 'Requires VITE_VARIANT=happy — run: npm run test:e2e:theme-happy');
+      return;
+    }
     // Set variant to happy, clear theme preference ONLY on first load
     // (addInitScript runs on every navigation, so we use a flag)
     await page.addInitScript(() => {

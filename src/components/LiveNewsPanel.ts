@@ -2,7 +2,7 @@ import { Panel } from './Panel';
 import { fetchLiveVideoInfo } from '@/services/live-news';
 import { isDesktopRuntime, getRemoteApiBaseUrl, getApiBaseUrl, getLocalApiPort } from '@/services/runtime';
 import { t } from '../services/i18n';
-import { loadFromStorage, saveToStorage } from '@/utils';
+import { loadFromStorage, saveToStorage, isMobileDevice } from '@/utils';
 import { IDLE_PAUSE_MS, STORAGE_KEYS, SITE_VARIANT } from '@/config';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
@@ -50,7 +50,9 @@ declare global {
 export interface LiveChannel {
   id: string;
   name: string;
-  handle?: string; // YouTube channel handle (e.g., @bloomberg) - optional for HLS streams
+  handle?: string; // YouTube channel handle (e.g., @bloomberg) - optional for HLS or channelId-only
+  /** YouTube channel ID (UC…) — used for /api/youtube/live when no @handle (e.g. NASA TV Public) */
+  channelId?: string;
   fallbackVideoId?: string; // Fallback if no live stream detected
   videoId?: string; // Dynamically fetched live video ID
   isLive?: boolean;
@@ -78,7 +80,7 @@ const TECH_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'bloomberg', name: 'Bloomberg', handle: '@markets', fallbackVideoId: 'iEpJwprxDdk' },
   { id: 'yahoo', name: 'Yahoo Finance', handle: '@YahooFinance', fallbackVideoId: 'KQp-e_XQnDE' },
   { id: 'cnbc', name: 'CNBC', handle: '@CNBC', fallbackVideoId: '9NyxcX3rhQs' },
-  { id: 'nasa', name: 'Sen Space Live', handle: '@NASA', fallbackVideoId: 'aB1yRz0HhdY', useFallbackOnly: true },
+  { id: 'nasa', name: 'NASA', handle: '@NASA' },
 ];
 
 // Optional channels users can add from the "Available Channels" tab UI
@@ -97,7 +99,22 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'cbc-news', name: 'CBC News', handle: '@CBCNews', fallbackVideoId: 'jxP_h3V-Dv8' },
   { id: 'ctv-news', name: 'CTV News', hlsUrl: 'https://pe-fa-lp02a.9c9media.com/live/News1Digi/p/hls/00000201/38ef78f479b07aa0/index/0c6a10a2/live/stream/h264/v1/3500000/manifest.m3u8', useFallbackOnly: true },
   { id: 'reuters-tv', name: 'Reuters TV', hlsUrl: 'https://reuters-reutersnow-1-eu.rakuten.wurl.tv/playlist.m3u8', useFallbackOnly: true },
-  { id: 'nasa', name: 'Sen Space Live', handle: '@NASA', fallbackVideoId: 'aB1yRz0HhdY', useFallbackOnly: true },
+  // NASA — featured on youtube.com/@NASA/channels (re-sync periodically)
+  { id: 'nasa', name: 'NASA', handle: '@NASA' },
+  { id: 'nasa-tv-public', name: 'NASA TV (Public)', channelId: 'UCNwkvBoDag92nHiZBzbYicA' },
+  { id: 'nasa-tv-mrg', name: 'NASA TV MRG', channelId: 'UCTxJzMvAwoq-HPudes1I1mw' },
+  { id: 'nasa-es', name: 'NASA en Español', handle: '@nasa_es' },
+  { id: 'nasa-learn', name: 'Learn With NASA', handle: '@LearnWithNASA' },
+  { id: 'nasa-ames', name: 'NASA Ames Research Center', handle: '@NASAAmes' },
+  { id: 'nasa-armstrong', name: 'NASA Armstrong Flight Research Center', handle: '@NASAArmstrong' },
+  { id: 'nasa-glenn', name: 'NASA Glenn Research Center', handle: '@nasaglenn' },
+  { id: 'nasa-goddard', name: 'NASA Goddard', handle: '@NASAGoddard' },
+  { id: 'nasa-langley', name: 'NASA Langley Research Center', handle: '@NASALANGLEY' },
+  { id: 'nasa-jpl', name: 'NASA Jet Propulsion Laboratory', handle: '@NASAJPL' },
+  { id: 'nasa-johnson', name: 'NASA Johnson', channelId: 'UCmheCYT4HlbFi943lpH009Q' },
+  { id: 'nasa-kennedy', name: 'NASA Kennedy Space Center', handle: '@NASAKennedy' },
+  { id: 'nasa-marshall', name: 'NASA Marshall Space Flight Center', handle: '@NASAMarshall' },
+  { id: 'nasa-stennis', name: 'NASA Stennis', handle: '@NASAStennis' },
   // Europe (defaults first)
   { id: 'sky', name: 'SkyNews', handle: '@SkyNews', fallbackVideoId: 'uvviIF4725I' },
   { id: 'euronews', name: 'Euronews', handle: '@euronews', fallbackVideoId: 'pykpO5kQJ98' },
@@ -185,7 +202,8 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
 ];
 
 const _REGION_ENTRIES: { key: string; labelKey: string; channelIds: string[] }[] = [
-  { key: 'na', labelKey: 'components.liveNews.regionNorthAmerica', channelIds: ['bloomberg', 'cnbc', 'yahoo', 'cnn', 'fox-news', 'newsmax', 'abc-news', 'cbs-news', 'nbc-news', 'cbc-news', 'ctv-news', 'reuters-tv', 'nasa'] },
+  { key: 'na', labelKey: 'components.liveNews.regionNorthAmerica', channelIds: ['bloomberg', 'cnbc', 'yahoo', 'cnn', 'fox-news', 'newsmax', 'abc-news', 'cbs-news', 'nbc-news', 'cbc-news', 'ctv-news', 'reuters-tv'] },
+  { key: 'nasa', labelKey: 'components.liveNews.regionNASA', channelIds: ['nasa', 'nasa-tv-public', 'nasa-tv-mrg', 'nasa-es', 'nasa-learn', 'nasa-ames', 'nasa-armstrong', 'nasa-glenn', 'nasa-goddard', 'nasa-langley', 'nasa-jpl', 'nasa-johnson', 'nasa-kennedy', 'nasa-marshall', 'nasa-stennis'] },
   { key: 'eu', labelKey: 'components.liveNews.regionEurope', channelIds: ['sky', 'euronews', 'dw', 'france24', 'bbc-news', 'gb-news', 'the-guardian', 'france24-en', 'phoenix', 'rtp3', 'welt', 'rtve', 'trt-haber', 'ntv-turkey', 'cnn-turk', 'tv-rain', 'rt', 'tvp-info', 'telewizja-republika', 'tagesschau24', 'euronews-fr', 'france24-fr', 'france-info', 'bfmtv', 'tv5monde-info', 'nrk1', 'aljazeera-balkans'] },
   { key: 'latam', labelKey: 'components.liveNews.regionLatinAmerica', channelIds: ['cnn-brasil', 'jovem-pan', 'record-news', 'band-jornalismo', 'tn-argentina', 'c5n', 'milenio', 'noticias-caracol', 'ntn24', 't13', 'dw-espanol', 'rt-espanol', 'cgtn-espanol'] },
   { key: 'asia', labelKey: 'components.liveNews.regionAsia', channelIds: ['tbs-news', 'ann-news', 'ntv-news', 'cti-news', 'cgtn', 'wion', 'ndtv', 'cna-asia', 'nhk-world', 'arirang-news', 'india-today', 'abp-news'] },
@@ -295,13 +313,17 @@ const PROXIED_HLS_MAP: Readonly<Record<string, ProxiedHlsEntry>> = {
 
 const IDLE_ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'] as const;
 
+const SKINWALKER_MAX_GRID = 2;
+const SKINWALKER_STAGGER_MS = 800;
+type SkinwalkerViewMode = 'grid' | 'single';
+
 if (import.meta.env.DEV) {
   const allChannels = [...FULL_LIVE_CHANNELS, ...TECH_LIVE_CHANNELS, ...OPTIONAL_LIVE_CHANNELS];
   for (const id of Object.keys(DIRECT_HLS_MAP)) {
     const ch = allChannels.find(c => c.id === id);
     if (!ch) console.error(`[LiveNews] DIRECT_HLS_MAP key '${id}' has no matching channel`);
-    else if (!ch.fallbackVideoId && !ch.hlsUrl && !ch.handle) {
-      console.error(`[LiveNews] Channel '${id}' in DIRECT_HLS_MAP lacks fallback (videoId/hlsUrl/handle)`);
+    else if (!ch.fallbackVideoId && !ch.hlsUrl && !ch.handle && !ch.channelId) {
+      console.error(`[LiveNews] Channel '${id}' in DIRECT_HLS_MAP lacks fallback (videoId/hlsUrl/handle/channelId)`);
     }
   }
 }
@@ -322,7 +344,7 @@ export function loadChannelsFromStorage(storageSuffix = ''): LiveChannel[] {
   for (const c of TECH_LIVE_CHANNELS) channelMap.set(c.id, { ...c });
   for (const c of OPTIONAL_LIVE_CHANNELS) channelMap.set(c.id, { ...c });
   for (const c of stored.custom ?? []) {
-    if (c.id && c.handle) channelMap.set(c.id, { ...c });
+    if (c.id && (c.handle || c.channelId)) channelMap.set(c.id, { ...c });
   }
   const overrides = stored.displayNameOverrides ?? {};
   for (const [id, name] of Object.entries(overrides)) {
@@ -350,6 +372,23 @@ export function saveChannelsToStorage(channels: LiveChannel[], storageSuffix = '
     }
   }
   saveToStorage(key, { order, custom, displayNameOverrides });
+}
+
+/** Query value for `/api/youtube/live?channel=` — UC… or @handle */
+export function liveChannelYoutubeQueryParam(ch: LiveChannel): string | null {
+  const cid = ch.channelId?.trim();
+  if (cid && /^UC[a-zA-Z0-9_-]{22}$/.test(cid)) return cid;
+  const h = ch.handle?.trim();
+  if (h && h !== '@video') return h.startsWith('@') ? h : `@${h}`;
+  return null;
+}
+
+export function liveChannelYoutubeBrowseUrl(ch: LiveChannel): string {
+  const cid = ch.channelId?.trim();
+  if (cid && /^UC[a-zA-Z0-9_-]{22}$/.test(cid)) return `https://www.youtube.com/channel/${cid}`;
+  const h = ch.handle?.trim();
+  if (h && h !== '@video') return `https://www.youtube.com/${h}`;
+  return 'https://www.youtube.com';
 }
 
 export type LiveNewsPanelKey = 'live-news' | 'live-news-2';
@@ -414,10 +453,17 @@ export class LiveNewsPanel extends Panel {
   private lazyObserver: IntersectionObserver | null = null;
   private idleCallbackId: number | ReturnType<typeof setTimeout> | null = null;
 
+  private skinwalkerViewMode: SkinwalkerViewMode = 'single';
+  private readonly forceSkinwalkerSingle: boolean;
+  private skinwalkerGridRenderToken = 0;
+  private skinwalkerViewToolbarGroup: HTMLElement | null = null;
+  private skinwalkerVisibilityObserver: IntersectionObserver | null = null;
+  private skinwalkerGridInView = true;
+
   constructor(options?: LiveNewsPanelOptions) {
     const panelKey = options?.panelKey ?? 'live-news';
     const storageSuffix = panelKey === 'live-news-2' ? '-2' : '';
-    const title = panelKey === 'live-news-2' ? (t('panels.liveNews2') ?? 'Live News 2') : t('panels.liveNews');
+    const title = panelKey === 'live-news-2' ? (t('panels.liveNews2') ?? 'Skinwalker Ranch') : t('panels.liveNews');
     super({ id: panelKey, title, className: 'panel-wide', closable: true });
     this.panelKey = panelKey;
     this.storageSuffix = storageSuffix;
@@ -430,6 +476,13 @@ export class LiveNewsPanel extends Panel {
     const savedChannelId = loadFromStorage<string>(activeKey, '');
     const savedChannel = savedChannelId ? this.channels.find(c => c.id === savedChannelId) : null;
     this.activeChannel = savedChannel ?? this.channels[0]!;
+    this.forceSkinwalkerSingle =
+      panelKey === 'live-news-2' && !isDesktopRuntime() && isMobileDevice();
+    if (panelKey === 'live-news-2') {
+      const stored = loadFromStorage<string>(STORAGE_KEYS.skinwalkerViewMode, 'single');
+      this.skinwalkerViewMode =
+        this.forceSkinwalkerSingle ? 'single' : stored === 'grid' ? 'grid' : 'single';
+    }
     this.createLiveButton();
     this.createMuteButton();
     this.createChannelSwitcher();
@@ -452,7 +505,10 @@ export class LiveNewsPanel extends Panel {
 
     const label = document.createElement('div');
     label.style.cssText = 'color:var(--text-secondary);font-size:13px;';
-    label.textContent = this.getChannelDisplayName(this.activeChannel);
+    label.textContent =
+      this.panelKey === 'live-news-2' && this.skinwalkerViewMode === 'grid'
+        ? (t('components.liveNews.skinwalkerLoadGrid') ?? 'Load dual view')
+        : this.getChannelDisplayName(this.activeChannel);
 
     const playBtn = document.createElement('button');
     playBtn.className = 'offline-retry';
@@ -489,6 +545,10 @@ export class LiveNewsPanel extends Panel {
     this.lazyObserver.observe(this.element);
   }
 
+  private isSkinwalkerGridActive(): boolean {
+    return this.panelKey === 'live-news-2' && this.skinwalkerViewMode === 'grid' && !this.forceSkinwalkerSingle;
+  }
+
   private triggerInit(): void {
     if (this.deferredInit) return;
     this.deferredInit = true;
@@ -498,7 +558,11 @@ export class LiveNewsPanel extends Panel {
       else clearTimeout(this.idleCallbackId as ReturnType<typeof setTimeout>);
       this.idleCallbackId = null;
     }
-    this.renderPlayer();
+    if (this.isSkinwalkerGridActive()) {
+      void this.renderSkinwalkerGrid();
+    } else {
+      this.renderPlayer();
+    }
   }
 
   private saveChannels(): void {
@@ -644,6 +708,10 @@ export class LiveNewsPanel extends Panel {
       this.updateLiveIndicator();
     }
     this.destroyPlayer();
+    if (this.isSkinwalkerGridActive()) {
+      this.bumpSkinwalkerGridToken();
+      this.content.innerHTML = `<div class="live-news-placeholder skinwalker-grid-paused" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">${escapeHtml(t('components.liveNews.skinwalkerPaused') ?? 'Streams paused (idle)')}</div>`;
+    }
   }
 
   private stopMuteSyncPolling(): void {
@@ -709,7 +777,13 @@ export class LiveNewsPanel extends Panel {
     if (this.wasPlayingBeforeIdle && !this.isPlaying) {
       this.isPlaying = true;
       this.updateLiveIndicator();
-      void this.initializePlayer();
+      if (this.isSkinwalkerGridActive() && this.skinwalkerGridInView) {
+        void this.renderSkinwalkerGrid();
+      } else if (this.isSkinwalkerGridActive() && !this.skinwalkerGridInView) {
+        this.showSkinwalkerOffscreenPlaceholder();
+      } else {
+        void this.initializePlayer();
+      }
     }
   }
 
@@ -892,7 +966,282 @@ export class LiveNewsPanel extends Panel {
     toolbar.className = 'live-news-toolbar';
     toolbar.appendChild(this.channelSwitcher);
     this.createManageButton(toolbar);
+    if (this.panelKey === 'live-news-2') {
+      this.createSkinwalkerViewToggle(toolbar);
+      this.setupSkinwalkerGridVisibility();
+      this.updateSkinwalkerSwitcherVisibility();
+      this.updateSkinwalkerHeaderControls();
+    }
     this.element.insertBefore(toolbar, this.content);
+  }
+
+  private createSkinwalkerViewToggle(toolbar: HTMLElement): void {
+    const viewGroup = document.createElement('div');
+    viewGroup.className = 'webcam-toolbar-group skinwalker-view-group';
+    this.skinwalkerViewToolbarGroup = viewGroup;
+
+    const gridBtn = document.createElement('button');
+    gridBtn.type = 'button';
+    gridBtn.className = `webcam-view-btn${this.skinwalkerViewMode === 'grid' ? ' active' : ''}`;
+    gridBtn.dataset.mode = 'grid';
+    gridBtn.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="4" width="14" height="6" rx="1"/><rect x="5" y="14" width="14" height="6" rx="1"/></svg>';
+    gridBtn.title = t('components.liveNews.skinwalkerGridView') ?? 'Dual view (stacked)';
+    gridBtn.addEventListener('click', () => this.setSkinwalkerViewMode('grid'));
+
+    const singleBtn = document.createElement('button');
+    singleBtn.type = 'button';
+    singleBtn.className = `webcam-view-btn${this.skinwalkerViewMode === 'single' ? ' active' : ''}`;
+    singleBtn.dataset.mode = 'single';
+    singleBtn.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="3" y="3" width="18" height="14" rx="2"/><rect x="3" y="19" width="18" height="2" rx="1"/></svg>';
+    singleBtn.title = t('components.liveNews.skinwalkerSingleView') ?? 'Single view';
+    singleBtn.addEventListener('click', () => this.setSkinwalkerViewMode('single'));
+
+    if (this.forceSkinwalkerSingle) {
+      gridBtn.disabled = true;
+      gridBtn.style.display = 'none';
+    }
+
+    viewGroup.appendChild(gridBtn);
+    viewGroup.appendChild(singleBtn);
+    toolbar.appendChild(viewGroup);
+  }
+
+  private setSkinwalkerViewMode(mode: SkinwalkerViewMode): void {
+    if (this.forceSkinwalkerSingle && mode === 'grid') return;
+    if (mode === this.skinwalkerViewMode) return;
+    this.skinwalkerViewMode = mode;
+    saveToStorage(STORAGE_KEYS.skinwalkerViewMode, mode);
+    this.skinwalkerViewToolbarGroup?.querySelectorAll('.webcam-view-btn').forEach((btn) => {
+      const el = btn as HTMLElement;
+      el.classList.toggle('active', el.dataset.mode === mode);
+    });
+    this.updateSkinwalkerSwitcherVisibility();
+    this.updateSkinwalkerHeaderControls();
+
+    if (!this.deferredInit) {
+      this.renderPlaceholder();
+      return;
+    }
+
+    if (mode === 'grid') {
+      this.destroyPlayer();
+      if (this.skinwalkerGridInView) {
+        void this.renderSkinwalkerGrid();
+      } else {
+        this.showSkinwalkerOffscreenPlaceholder();
+      }
+    } else {
+      this.bumpSkinwalkerGridToken();
+      this.content.innerHTML = '';
+      this.renderPlayer();
+      void this.initializePlayer();
+    }
+  }
+
+  private updateSkinwalkerSwitcherVisibility(): void {
+    if (!this.channelSwitcher) return;
+    if (this.panelKey === 'live-news-2' && this.skinwalkerViewMode === 'grid') {
+      this.channelSwitcher.style.display = 'none';
+    } else {
+      this.channelSwitcher.style.display = '';
+    }
+  }
+
+  private updateSkinwalkerHeaderControls(): void {
+    const grid = this.panelKey === 'live-news-2' && this.skinwalkerViewMode === 'grid';
+    if (this.liveBtn) this.liveBtn.style.display = grid ? 'none' : '';
+    if (this.muteBtn) this.muteBtn.style.display = grid ? 'none' : '';
+  }
+
+  private bumpSkinwalkerGridToken(): void {
+    this.skinwalkerGridRenderToken++;
+  }
+
+  private setupSkinwalkerGridVisibility(): void {
+    if (this.panelKey !== 'live-news-2') return;
+    this.skinwalkerVisibilityObserver = new IntersectionObserver(
+      (entries) => {
+        const vis = entries.some((e) => e.isIntersecting);
+        this.skinwalkerGridInView = vis;
+        if (!this.isSkinwalkerGridActive() || !this.deferredInit) return;
+        if (!vis) {
+          this.bumpSkinwalkerGridToken();
+          this.teardownSkinwalkerGridMedia();
+          this.showSkinwalkerOffscreenPlaceholder();
+        } else if (this.isPlaying && !this.content.querySelector('.skinwalker-grid')) {
+          void this.renderSkinwalkerGrid();
+        }
+      },
+      { threshold: 0.1 },
+    );
+    this.skinwalkerVisibilityObserver.observe(this.element);
+  }
+
+  private teardownSkinwalkerGridMedia(): void {
+    this.content.querySelectorAll('.skinwalker-grid-cell-player iframe').forEach((el) => {
+      (el as HTMLIFrameElement).src = 'about:blank';
+    });
+    this.content.querySelectorAll('.skinwalker-grid-cell-player video').forEach((el) => {
+      const v = el as HTMLVideoElement;
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+    });
+  }
+
+  private showSkinwalkerOffscreenPlaceholder(): void {
+    if (!this.isSkinwalkerGridActive() || !this.deferredInit) return;
+    this.content.innerHTML = `<div class="live-news-placeholder skinwalker-offscreen" style="display:flex;align-items:center;justify-content:center;height:100%;padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">${escapeHtml(t('components.liveNews.skinwalkerNotVisible') ?? 'Scroll this panel into view to load streams.')}</div>`;
+  }
+
+  private buildSkinwalkerDesktopEmbedUrl(videoId: string): string {
+    const quality = getStreamQuality();
+    const params = new URLSearchParams({
+      videoId,
+      autoplay: this.isPlaying ? '1' : '0',
+      mute: '1',
+    });
+    if (quality !== 'auto') params.set('vq', quality);
+    params.set('origin', this.youtubeOrigin || 'https://worldmonitor.app');
+    params.set('parentOrigin', window.location.origin);
+    return `http://localhost:${getLocalApiPort()}/api/youtube-embed?${params.toString()}`;
+  }
+
+  private mountSkinwalkerGridCell(
+    copy: LiveChannel,
+    playerWrap: HTMLElement,
+    renderToken: number,
+  ): void {
+    const mount = (): void => {
+      if (renderToken !== this.skinwalkerGridRenderToken || !this.element.isConnected) return;
+      void (async () => {
+        await this.resolveChannelVideo(copy);
+        if (renderToken !== this.skinwalkerGridRenderToken || !this.element.isConnected) return;
+
+        let hls =
+          this.getDirectHlsUrl(copy.id) ||
+          this.getProxiedHlsUrl(copy.id) ||
+          (copy.hlsUrl && (copy.hlsUrl.startsWith('https://') || copy.hlsUrl.startsWith('http://'))
+            ? copy.hlsUrl
+            : undefined);
+        if (
+          hls &&
+          (hls.startsWith('https://') || hls.startsWith('http://127.0.0.1') || hls.startsWith('http://localhost'))
+        ) {
+          const video = document.createElement('video');
+          video.className = 'live-news-native-video skinwalker-grid-video';
+          video.src = hls;
+          video.autoplay = this.isPlaying;
+          video.muted = true;
+          video.playsInline = true;
+          video.controls = true;
+          video.setAttribute('referrerpolicy', 'no-referrer');
+          video.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000';
+          playerWrap.appendChild(video);
+          return;
+        }
+
+        const vid = copy.videoId;
+        if (!vid || !/^[\w-]{10,12}$/.test(vid)) {
+          playerWrap.innerHTML = `<div class="skinwalker-grid-offline">${escapeHtml(t('components.liveNews.notLive', { name: copy.name }))}</div>`;
+          return;
+        }
+
+        if (this.useDesktopEmbedProxy) {
+          const iframe = document.createElement('iframe');
+          iframe.className = 'live-news-embed-frame';
+          iframe.src = this.buildSkinwalkerDesktopEmbedUrl(vid);
+          iframe.title = `${copy.name} live`;
+          iframe.style.cssText = 'width:100%;height:100%;border:0';
+          iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen; storage-access';
+          iframe.allowFullscreen = true;
+          iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+          playerWrap.appendChild(iframe);
+        } else {
+          const iframe = document.createElement('iframe');
+          iframe.className = 'live-news-embed-frame';
+          iframe.src = `https://www.youtube.com/embed/${encodeURIComponent(vid)}?autoplay=1&mute=1&playsinline=1&rel=0`;
+          iframe.title = `${copy.name} live`;
+          iframe.style.cssText = 'width:100%;height:100%;border:0';
+          iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+          iframe.allowFullscreen = true;
+          playerWrap.appendChild(iframe);
+        }
+      })();
+    };
+    mount();
+  }
+
+  private async renderSkinwalkerGrid(): Promise<void> {
+    if (!this.isSkinwalkerGridActive()) return;
+    this.destroyPlayer();
+    this.bumpSkinwalkerGridToken();
+    const renderToken = this.skinwalkerGridRenderToken;
+    this.content.innerHTML = '';
+    this.content.className = 'panel-content skinwalker-grid-panel';
+
+    const slice = this.channels.slice(0, SKINWALKER_MAX_GRID);
+    if (slice.length === 0) {
+      this.content.innerHTML = `<div class="skinwalker-grid-offline">${escapeHtml(t('components.liveNews.skinwalkerNoChannels') ?? 'Add channels in settings.')}</div>`;
+      return;
+    }
+
+    const root = document.createElement('div');
+    root.className = 'skinwalker-grid';
+
+    if (this.channels.length > SKINWALKER_MAX_GRID) {
+      const note = document.createElement('div');
+      note.className = 'skinwalker-grid-note';
+      note.textContent =
+        t('components.liveNews.skinwalkerGridCap', { n: String(SKINWALKER_MAX_GRID) }) ??
+        `Showing top ${SKINWALKER_MAX_GRID} feeds (reorder in channel settings).`;
+      root.appendChild(note);
+    }
+
+    const cellsWrap = document.createElement('div');
+    cellsWrap.className = 'skinwalker-grid-cells';
+
+    for (let i = 0; i < slice.length; i++) {
+      const ch = slice[i]!;
+      const cell = document.createElement('div');
+      cell.className = 'skinwalker-grid-cell';
+
+      const playerWrap = document.createElement('div');
+      playerWrap.className = 'skinwalker-grid-cell-player';
+      cell.appendChild(playerWrap);
+
+      const label = document.createElement('button');
+      label.type = 'button';
+      label.className = 'skinwalker-grid-cell-label';
+      label.innerHTML = `<span>${escapeHtml(ch.name)}</span><span class="skinwalker-expand-hint">${escapeHtml(t('components.liveNews.skinwalkerOpenSingle') ?? 'Open')}</span>`;
+      label.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const full = this.channels.find((c) => c.id === ch.id) ?? ch;
+        this.activeChannel = full;
+        saveToStorage(STORAGE_KEYS.activeChannel + this.storageSuffix, full.id);
+        this.refreshChannelSwitcher();
+        this.setSkinwalkerViewMode('single');
+      });
+      cell.appendChild(label);
+
+      cellsWrap.appendChild(cell);
+
+      const copy: LiveChannel = { ...ch };
+      const scheduleMount = (): void => {
+        if (renderToken !== this.skinwalkerGridRenderToken) return;
+        this.mountSkinwalkerGridCell(copy, playerWrap, renderToken);
+      };
+      if (isDesktopRuntime() && i > 0) {
+        setTimeout(scheduleMount, i * SKINWALKER_STAGGER_MS);
+      } else {
+        scheduleMount();
+      }
+    }
+
+    root.appendChild(cellsWrap);
+    this.content.appendChild(root);
   }
 
   private createManageButton(toolbar: HTMLElement): void {
@@ -987,14 +1336,14 @@ export class LiveNewsPanel extends Panel {
       return;
     }
 
-    // Skip fetchLiveVideoInfo for channels without handle (HLS-only)
-    if (!channel.handle) {
+    const ytParam = liveChannelYoutubeQueryParam(channel);
+    if (!ytParam) {
       channel.videoId = channel.fallbackVideoId;
       channel.isLive = false;
       return;
     }
 
-    const info = await fetchLiveVideoInfo(channel.handle);
+    const info = await fetchLiveVideoInfo(ytParam);
     channel.videoId = info.videoId || channel.fallbackVideoId;
     channel.isLive = !!info.videoId;
     channel.hlsUrl = info.hlsUrl || undefined;
@@ -1065,9 +1414,7 @@ export class LiveNewsPanel extends Panel {
     this.destroyPlayer();
     const watchUrl = channel.videoId
       ? `https://www.youtube.com/watch?v=${encodeURIComponent(channel.videoId)}`
-      : channel.handle
-      ? `https://www.youtube.com/${encodeURIComponent(channel.handle)}`
-      : 'https://www.youtube.com';
+      : liveChannelYoutubeBrowseUrl(channel);
     const safeName = escapeHtml(channel.name);
 
     this.content.innerHTML = `
@@ -1463,9 +1810,7 @@ export class LiveNewsPanel extends Panel {
     const channel = this.activeChannel;
     const watchUrl = channel.videoId
       ? `https://www.youtube.com/watch?v=${encodeURIComponent(channel.videoId)}`
-      : channel.handle
-      ? `https://www.youtube.com/${encodeURIComponent(channel.handle)}`
-      : 'https://www.youtube.com';
+      : liveChannelYoutubeBrowseUrl(channel);
 
     this.destroyPlayer();
     this.content.innerHTML = '';
@@ -1614,12 +1959,20 @@ export class LiveNewsPanel extends Panel {
     if (this.channels.length === 0) this.channels = getDefaultLiveChannels();
     if (!this.channels.some((c) => c.id === this.activeChannel.id)) {
       this.activeChannel = this.channels[0]!;
-      void this.switchChannel(this.activeChannel);
+      saveToStorage(STORAGE_KEYS.activeChannel + this.storageSuffix, this.activeChannel.id);
+      if (!this.isSkinwalkerGridActive()) {
+        void this.switchChannel(this.activeChannel);
+      }
     }
     this.refreshChannelSwitcher();
+    if (this.isSkinwalkerGridActive() && this.deferredInit && this.isPlaying && this.skinwalkerGridInView) {
+      void this.renderSkinwalkerGrid();
+    }
   }
 
   public destroy(): void {
+    this.skinwalkerVisibilityObserver?.disconnect();
+    this.skinwalkerVisibilityObserver = null;
     this.destroyPlayer();
     this.unsubscribeStreamSettings?.();
     this.unsubscribeStreamSettings = null;

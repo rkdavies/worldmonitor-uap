@@ -11,13 +11,13 @@ type OverlaySnapshot = {
 
 type VisualScenarioSummary = {
   id: string;
-  variant: 'both' | 'full' | 'tech' | 'finance';
+  variant: 'both' | 'full' | 'tech' | 'finance' | 'uap';
 };
 
 type HarnessWindow = Window & {
   __mapHarness?: {
     ready: boolean;
-    variant: 'full' | 'tech' | 'finance';
+    variant: 'full' | 'tech' | 'finance' | 'uap';
     seedAllDynamicData: () => void;
     setProtestsScenario: (scenario: 'alpha' | 'beta') => void;
     setPulseProtestsScenario: (
@@ -76,10 +76,7 @@ const EXPECTED_FULL_DECK_LAYERS = [
   'military-flights-layer',
   'military-flight-clusters-layer',
   'waterways-layer',
-  'economic-centers-layer',
   'minerals-layer',
-  'apt-groups-layer',
-  'news-locations-layer',
 ];
 
 const EXPECTED_TECH_DECK_LAYERS = [
@@ -119,11 +116,19 @@ const EXPECTED_TECH_DECK_LAYERS = [
 
 const EXPECTED_FINANCE_DECK_LAYERS = [
   ...EXPECTED_FULL_DECK_LAYERS,
+  'economic-centers-layer',
+  'news-locations-layer',
   'stock-exchanges-layer',
   'financial-centers-layer',
   'central-banks-layer',
   'commodity-hubs-layer',
   'gulf-investments-layer',
+];
+
+/** UAP harness: same seeded deck coverage as full plus UAP sightings dots. */
+const EXPECTED_UAP_DECK_LAYERS = [
+  ...EXPECTED_FULL_DECK_LAYERS,
+  'uap-sightings-dot-layer',
 ];
 
 const waitForHarnessReady = async (
@@ -175,11 +180,14 @@ test.describe('DeckGL map harness', () => {
       return w.__mapHarness?.variant ?? 'full';
     });
 
-    const expectedVariant = process.env.VITE_VARIANT === 'tech'
-      ? 'tech'
-      : process.env.VITE_VARIANT === 'finance'
-      ? 'finance'
-      : 'full';
+    const expectedVariant =
+      process.env.VITE_VARIANT === 'tech'
+        ? 'tech'
+        : process.env.VITE_VARIANT === 'finance'
+          ? 'finance'
+          : process.env.VITE_VARIANT === 'uap'
+            ? 'uap'
+            : 'full';
     expect(runtimeVariant).toBe(expectedVariant);
   });
 
@@ -230,11 +238,14 @@ test.describe('DeckGL map harness', () => {
       return w.__mapHarness?.variant ?? 'full';
     });
 
-    const expectedDeckLayers = variant === 'tech'
-      ? EXPECTED_TECH_DECK_LAYERS
-      : variant === 'finance'
-      ? EXPECTED_FINANCE_DECK_LAYERS
-      : EXPECTED_FULL_DECK_LAYERS;
+    const expectedDeckLayers =
+      variant === 'tech'
+        ? EXPECTED_TECH_DECK_LAYERS
+        : variant === 'finance'
+          ? EXPECTED_FINANCE_DECK_LAYERS
+          : variant === 'uap'
+            ? EXPECTED_UAP_DECK_LAYERS
+            : EXPECTED_FULL_DECK_LAYERS;
 
     await expect
       .poll(async () => {
@@ -245,7 +256,19 @@ test.describe('DeckGL map harness', () => {
         const nonEmptyIds = new Set(
           snapshot.filter((layer) => layer.dataCount > 0).map((layer) => layer.id)
         );
-        return expectedDeckLayers.filter((id) => !nonEmptyIds.has(id)).length;
+        const layerSatisfied = (id: string): boolean => {
+          if (
+            variant === 'uap' &&
+            id === 'conflict-zones-layer'
+          ) {
+            return (
+              nonEmptyIds.has('conflict-zones-layer') ||
+              nonEmptyIds.has('conflict-zones-layer-country-geometry')
+            );
+          }
+          return nonEmptyIds.has(id);
+        };
+        return expectedDeckLayers.filter((id) => !layerSatisfied(id)).length;
       }, { timeout: 40000 })
       .toBe(0);
 

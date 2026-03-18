@@ -1,7 +1,9 @@
 import type { CountryBriefSignals } from '@/types';
 import { getSourcePropagandaRisk, getSourceTier } from '@/config/feeds';
+import { SITE_VARIANT } from '@/config/variant';
 import { getCountryCentroid, ME_STRIKE_BOUNDS } from '@/services/country-geometry';
 import type { CountryScore } from '@/services/country-instability';
+import type { AaiScore, RecentSightingSummary } from '@/generated/client/worldmonitor/uap/v1/service_client';
 import { t } from '@/services/i18n';
 import { getNearbyInfrastructure } from '@/services/related-assets';
 import type { PredictionMarket } from '@/services/prediction';
@@ -126,7 +128,19 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         this.minimize();
       }
     });
+
+    document.addEventListener('click', this.boundHandleDocumentClick);
   }
+
+  private readonly boundHandleDocumentClick = (e: MouseEvent): void => {
+    if (!this.panel.classList.contains('active')) return;
+    if (this.panel.contains(e.target as Node)) return;
+    if (this.panel.dataset.ignoreNextOutsideClick) {
+      delete this.panel.dataset.ignoreNextOutsideClick;
+      return;
+    }
+    this.hide();
+  };
 
   public setMap(map: MapContainer | null): void {
     this.map = map;
@@ -177,14 +191,14 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.content.append(wrapper);
   }
 
-  public show(country: string, code: string, score: CountryScore | null, signals: CountryBriefSignals): void {
+  public show(country: string, code: string, score: CountryScore | null, signals: CountryBriefSignals, aaiScore?: AaiScore | null): void {
     this.abortController.abort();
     this.abortController = new AbortController();
     this.currentCode = code;
     this.currentName = country;
     this.economicIndicators = [];
     this.infrastructureByType.clear();
-    this.renderSkeleton(country, code, score, signals);
+    this.renderSkeleton(country, code, score, signals, aaiScore ?? null);
     this.open();
   }
 
@@ -345,6 +359,87 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.militaryBody.append(list);
   }
 
+  public updateSensorCoverage(nearby: { name: string; distanceKm: number }[]): void {
+    if (!this.militaryBody) return;
+    this.militaryBody.replaceChildren();
+
+    if (nearby.length === 0) {
+      this.militaryBody.append(this.makeEmpty(t('countryBrief.noSensorStationsNearby')));
+      return;
+    }
+
+    const list = this.el('ul', 'cdp-base-list');
+    for (const station of nearby.slice(0, 10)) {
+      const item = this.el('li', 'cdp-base-item');
+      const left = this.el('span', 'cdp-base-name', station.name);
+      const right = this.el('span', 'cdp-base-distance', `${Math.round(station.distanceKm)} km`);
+      item.append(left, right);
+      list.append(item);
+    }
+    this.militaryBody.append(list);
+  }
+
+  public updateSightingShapes(shapeCounts: Record<string, number>): void {
+    if (!this.marketsBody) return;
+    this.marketsBody.replaceChildren();
+
+    const entries = Object.entries(shapeCounts).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) {
+      this.marketsBody.append(this.makeEmpty(t('countryBrief.noSightingShapes')));
+      return;
+    }
+
+    const list = this.el('ul', 'cdp-shape-list');
+    for (const [shape, count] of entries.slice(0, 15)) {
+      const item = this.el('li', 'cdp-shape-item');
+      item.append(
+        this.el('span', 'cdp-shape-name', shape),
+        this.el('span', 'cdp-shape-count', String(count)),
+      );
+      list.append(item);
+    }
+    this.marketsBody.append(list);
+  }
+
+  public updateRecentSightings(sightings: RecentSightingSummary[]): void {
+    if (!this.timelineBody) return;
+    this.timelineBody.replaceChildren();
+
+    if (sightings.length === 0) {
+      this.timelineBody.append(this.makeEmpty(t('countryBrief.noRecentSightings')));
+      return;
+    }
+
+    const list = this.el('ul', 'cdp-recent-sightings-list');
+    for (const s of sightings) {
+      const item = this.el('li', 'cdp-recent-sighting-item');
+      const date = new Date((s.timestamp ?? 0) * 1000);
+      const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      const shape = (s.shape ?? '').trim() || 'Unknown';
+      const desc = (s.description ?? '').trim();
+      const line = desc ? `${shape} — ${desc.slice(0, 80)}${desc.length > 80 ? '…' : ''}` : shape;
+      item.append(
+        this.el('span', 'cdp-recent-sighting-date', dateStr),
+        this.el('span', 'cdp-recent-sighting-detail', line),
+      );
+      list.append(item);
+    }
+    this.timelineBody.append(list);
+  }
+
+  public updateInstitutionalActivity(institutionalActivity: number): void {
+    if (!this.economicBody) return;
+    this.economicBody.replaceChildren();
+
+    const p = this.el('p', 'cdp-institutional-activity');
+    if (institutionalActivity > 0) {
+      p.textContent = t('countryBrief.institutionalActivityScore', { score: String(institutionalActivity) });
+    } else {
+      p.textContent = t('countryBrief.noRegionalInstitutional');
+    }
+    this.economicBody.append(p);
+  }
+
   public updateInfrastructure(countryCode: string): void {
     if (!this.infrastructureBody) return;
     this.infrastructureBody.replaceChildren();
@@ -486,6 +581,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
 
   public updateScore(score: CountryScore | null, _signals: CountryBriefSignals): void {
     if (!this.scoreCard) return;
+    if (SITE_VARIANT === 'uap') return;
     // Partial DOM update: score number, level color, trend, component bars only
     const top = this.scoreCard.firstElementChild as HTMLElement | null;
     while (this.scoreCard.childElementCount > 1) {
@@ -616,7 +712,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.content.append(loading);
   }
 
-  private renderSkeleton(country: string, code: string, score: CountryScore | null, signals: CountryBriefSignals): void {
+  private renderSkeleton(country: string, code: string, score: CountryScore | null, signals: CountryBriefSignals, aaiScore: AaiScore | null = null): void {
     this.content.replaceChildren();
 
     const shell = this.el('div', 'cdp-shell');
@@ -625,7 +721,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     const flag = this.el('span', 'cdp-flag', CountryDeepDivePanel.toFlagEmoji(code));
     const titleWrap = this.el('div', 'cdp-title-wrap');
     const name = this.el('h2', 'cdp-country-name', country);
-    const subtitle = this.el('div', 'cdp-country-subtitle', `${code.toUpperCase()} • Country Intelligence`);
+    const subtitle = this.el('div', 'cdp-country-subtitle', `${code.toUpperCase()} • ${SITE_VARIANT === 'uap' ? 'UAP Regional Brief' : 'Country Intelligence'}`);
     titleWrap.append(name, subtitle);
     left.append(flag, titleWrap);
 
@@ -675,12 +771,38 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     const scoreCard = this.el('section', 'cdp-card cdp-score-card');
     this.scoreCard = scoreCard;
     const top = this.el('div', 'cdp-score-top');
-    const label = this.el('span', 'cdp-score-label', t('countryBrief.instabilityIndex'));
-    const updated = this.el('span', 'cdp-updated', `Updated ${this.shortDate(score?.lastUpdated ?? new Date())}`);
+    const isUap = SITE_VARIANT === 'uap';
+    const label = this.el('span', 'cdp-score-label', isUap ? t('panels.uapAai') : t('countryBrief.instabilityIndex'));
+    const updated = this.el('span', 'cdp-updated', isUap && aaiScore
+      ? `Updated ${this.shortDate(aaiScore.lastUpdated ? new Date(Number(aaiScore.lastUpdated) * 1000) : new Date())}`
+      : `Updated ${this.shortDate(score?.lastUpdated ?? new Date())}`);
     top.append(label, updated);
     scoreCard.append(top);
 
-    if (score) {
+    if (isUap) {
+      if (aaiScore) {
+        const adj = aaiScore.adjustedAaiScore ?? aaiScore.score;
+        const band = this.ciiBand(adj);
+        const scoreRow = this.el('div', 'cdp-score-row');
+        const value = this.el('div', `cdp-score-value cii-${band}`, `${adj}/100`);
+        const aaiTrendDir: TrendDirection =
+          aaiScore.trend === 'rising' || aaiScore.trend === 'up'
+            ? 'up'
+            : aaiScore.trend === 'falling' || aaiScore.trend === 'down'
+              ? 'down'
+              : 'flat';
+        const trend = this.el('div', 'cdp-trend', `${this.trendArrowFromDirection(aaiTrendDir)} ${aaiScore.trend}`);
+        scoreRow.append(value, trend);
+        scoreCard.append(scoreRow);
+        const meta = this.el('div', 'cdp-aai-meta');
+        const raw = aaiScore.score;
+        const ctx = aaiScore.observationContextIndex;
+        meta.innerHTML = `<span class="cdp-meta-item">Level: ${escapeHtml(aaiScore.level)}</span><span class="cdp-meta-item">Raw density: ${raw}</span>${ctx != null ? `<span class="cdp-meta-item">Context: ${ctx}</span>` : ''}<span class="cdp-meta-item">Sightings (90d): ${Math.round(aaiScore.sightingDensity ?? 0)}</span>${(aaiScore.institutionalActivity ?? 0) > 0 ? `<span class="cdp-meta-item">Institutional: ${Math.round(aaiScore.institutionalActivity)}</span>` : ''}`;
+        scoreCard.append(meta);
+      } else {
+        scoreCard.append(this.makeEmpty(t('countryBrief.ciiUnavailable')));
+      }
+    } else if (score) {
       const band = this.ciiBand(score.score);
       const scoreRow = this.el('div', 'cdp-score-row');
       const value = this.el('div', `cdp-score-value cii-${band}`, `${score.score}/100`);
@@ -694,12 +816,16 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
 
     const bodyGrid = this.el('div', 'cdp-grid');
     const [signalsCard, signalBody] = this.sectionCard(t('countryBrief.activeSignals'));
-    const [timelineCard, timelineBody] = this.sectionCard(t('countryBrief.timeline'));
+    const [timelineCard, timelineBody] = this.sectionCard(
+      isUap ? t('countryBrief.recentSightings') : t('countryBrief.timeline'),
+    );
     const [newsCard, newsBody] = this.sectionCard(t('countryBrief.topNews'));
-    const [militaryCard, militaryBody] = this.sectionCard(t('countryBrief.militaryActivity'));
-    const [infraCard, infraBody] = this.sectionCard(t('countryBrief.infrastructure'));
-    const [economicCard, economicBody] = this.sectionCard(t('countryBrief.economicIndicators'));
-    const [marketsCard, marketsBody] = this.sectionCard(t('countryBrief.predictionMarkets'));
+    const [economicCard, economicBody] = this.sectionCard(
+      isUap ? t('countryBrief.institutionalActivity') : t('countryBrief.economicIndicators'),
+    );
+    const [marketsCard, marketsBody] = this.sectionCard(
+      isUap ? t('countryBrief.sightingShapes') : t('countryBrief.predictionMarkets'),
+    );
     const [briefCard, briefBody] = this.sectionCard(t('countryBrief.intelBrief'));
 
     const [factsCard, factsBody] = this.sectionCard(t('countryBrief.countryFacts'));
@@ -712,74 +838,119 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.timelineBody = timelineBody;
     this.timelineBody.classList.add('cdp-timeline-mount');
     this.newsBody = newsBody;
-    this.militaryBody = militaryBody;
-    this.infrastructureBody = infraBody;
+    this.militaryBody = null;
+    this.infrastructureBody = null;
     this.economicBody = economicBody;
     this.marketsBody = marketsBody;
     this.briefBody = briefBody;
 
-    this.renderInitialSignals(signals);
-    newsBody.append(this.makeLoading('Loading country headlines…'));
-    militaryBody.append(this.makeLoading('Loading flights, vessels, and nearby bases…'));
-    infraBody.append(this.makeLoading('Computing nearby critical infrastructure…'));
-    economicBody.append(this.makeLoading('Loading available indicators…'));
-    marketsBody.append(this.makeLoading(t('countryBrief.loadingMarkets')));
-    briefBody.append(this.makeLoading(t('countryBrief.generatingBrief')));
+    if (!isUap) {
+      const [militaryCard, militaryBody] = this.sectionCard(t('countryBrief.militaryActivity'));
+      const [infraCard, infraBody] = this.sectionCard(t('countryBrief.infrastructure'));
+      this.militaryBody = militaryBody;
+      this.infrastructureBody = infraBody;
+      militaryBody.append(this.makeLoading('Loading flights, vessels, and nearby bases…'));
+      infraBody.append(this.makeLoading('Computing nearby critical infrastructure…'));
+      bodyGrid.append(briefCard, factsExpanded, signalsCard, timelineCard, newsCard, militaryCard, infraCard, economicCard, marketsCard);
+    } else {
+      bodyGrid.append(briefCard, factsExpanded, signalsCard, timelineCard, newsCard, economicCard, marketsCard);
+    }
 
-    bodyGrid.append(briefCard, factsExpanded, signalsCard, timelineCard, newsCard, militaryCard, infraCard, economicCard, marketsCard);
+    this.renderInitialSignals(signals, aaiScore);
+    newsBody.append(this.makeLoading('Loading country headlines…'));
+    if (isUap) {
+      economicBody.append(this.makeLoading(t('countryBrief.loadingInstitutional')));
+      marketsBody.append(this.makeLoading(t('countryBrief.loadingSightingShapes')));
+    } else {
+      this.economicBody?.append(this.makeLoading('Loading available indicators…'));
+      marketsBody.append(this.makeLoading(t('countryBrief.loadingMarkets')));
+    }
+    briefBody.append(this.makeLoading(t('countryBrief.generatingBrief')));
     shell.append(header, scoreCard, bodyGrid);
     this.content.append(shell);
   }
 
-  private renderInitialSignals(signals: CountryBriefSignals): void {
+  private renderInitialSignals(signals: CountryBriefSignals, aaiScore?: AaiScore | null): void {
     if (!this.signalsBody) return;
     this.signalsBody.replaceChildren();
 
     const chips = this.el('div', 'cdp-signal-chips');
-    this.addSignalChip(chips, signals.criticalNews, t('countryBrief.chips.criticalNews'), '🚨', 'conflict');
-    this.addSignalChip(chips, signals.protests, t('countryBrief.chips.protests'), '📢', 'protest');
-    this.addSignalChip(chips, signals.militaryFlights, t('countryBrief.chips.militaryAir'), '✈️', 'military');
-    this.addSignalChip(chips, signals.militaryVessels, t('countryBrief.chips.navalVessels'), '⚓', 'military');
-    this.addSignalChip(chips, signals.outages, t('countryBrief.chips.outages'), '🌐', 'outage');
-    this.addSignalChip(chips, signals.aisDisruptions, t('countryBrief.chips.aisDisruptions'), '🚢', 'outage');
-    this.addSignalChip(chips, signals.satelliteFires, t('countryBrief.chips.satelliteFires'), '🔥', 'climate');
-    this.addSignalChip(chips, signals.temporalAnomalies, t('countryBrief.chips.temporalAnomalies'), '⏱️', 'outage');
-    this.addSignalChip(chips, signals.cyberThreats, t('countryBrief.chips.cyberThreats'), '🛡️', 'conflict');
-    this.addSignalChip(chips, signals.earthquakes, t('countryBrief.chips.earthquakes'), '🌍', 'quake');
-    if (signals.displacementOutflow > 0) {
-      const fmt = signals.displacementOutflow >= 1_000_000
-        ? `${(signals.displacementOutflow / 1_000_000).toFixed(1)}M`
-        : `${(signals.displacementOutflow / 1000).toFixed(0)}K`;
-      chips.append(this.makeSignalChip(`🌊 ${fmt} ${t('countryBrief.chips.displaced')}`, 'displacement'));
+    const isUap = SITE_VARIANT === 'uap';
+
+    if (isUap) {
+      const periods: { count: number; labelKey: string }[] = aaiScore
+        ? [
+            { count: aaiScore.sightings1d ?? 0, labelKey: 'sightings1d' },
+            { count: aaiScore.sightings7d ?? 0, labelKey: 'sightings7d' },
+            { count: aaiScore.sightings30d ?? 0, labelKey: 'sightings1m' },
+            { count: aaiScore.sightings90d ?? 0, labelKey: 'sightings3m' },
+            { count: aaiScore.sightings180d ?? 0, labelKey: 'sightings6m' },
+            { count: aaiScore.sightings365d ?? 0, labelKey: 'sightings1y' },
+          ]
+        : [
+            { count: 0, labelKey: 'sightings1d' },
+            { count: 0, labelKey: 'sightings7d' },
+            { count: 0, labelKey: 'sightings1m' },
+            { count: 0, labelKey: 'sightings3m' },
+            { count: 0, labelKey: 'sightings6m' },
+            { count: 0, labelKey: 'sightings1y' },
+          ];
+      for (const { count, labelKey } of periods) {
+        const label = t(`countryBrief.sightingsPeriods.${labelKey}`);
+        chips.append(this.makeSignalChip(`👁️ ${count} ${label}`, 'uap'));
+      }
+    } else {
+      this.addSignalChip(chips, signals.criticalNews, t('countryBrief.chips.criticalNews'), '🚨', 'conflict');
+      this.addSignalChip(chips, signals.protests, t('countryBrief.chips.protests'), '📢', 'protest');
+      this.addSignalChip(chips, signals.militaryFlights, t('countryBrief.chips.militaryAir'), '✈️', 'military');
+      this.addSignalChip(chips, signals.militaryVessels, t('countryBrief.chips.navalVessels'), '⚓', 'military');
+      this.addSignalChip(chips, signals.outages, t('countryBrief.chips.outages'), '🌐', 'outage');
+      this.addSignalChip(chips, signals.aisDisruptions, t('countryBrief.chips.aisDisruptions'), '🚢', 'outage');
+      this.addSignalChip(chips, signals.satelliteFires, t('countryBrief.chips.satelliteFires'), '🔥', 'climate');
+      this.addSignalChip(chips, signals.temporalAnomalies, t('countryBrief.chips.temporalAnomalies'), '⏱️', 'outage');
+      this.addSignalChip(chips, signals.cyberThreats, t('countryBrief.chips.cyberThreats'), '🛡️', 'conflict');
+      this.addSignalChip(chips, signals.earthquakes, t('countryBrief.chips.earthquakes'), '🌍', 'quake');
+      if (signals.displacementOutflow > 0) {
+        const fmt = signals.displacementOutflow >= 1_000_000
+          ? `${(signals.displacementOutflow / 1_000_000).toFixed(1)}M`
+          : `${(signals.displacementOutflow / 1000).toFixed(0)}K`;
+        chips.append(this.makeSignalChip(`🌊 ${fmt} ${t('countryBrief.chips.displaced')}`, 'displacement'));
+      }
+      this.addSignalChip(chips, signals.climateStress, t('countryBrief.chips.climateStress'), '🌡️', 'climate');
+      this.addSignalChip(chips, signals.conflictEvents, t('countryBrief.chips.conflictEvents'), '⚔️', 'conflict');
+      this.addSignalChip(chips, signals.activeStrikes, t('countryBrief.chips.activeStrikes'), '💥', 'conflict');
+      if (signals.travelAdvisories > 0 && signals.travelAdvisoryMaxLevel) {
+        const advLabel = signals.travelAdvisoryMaxLevel === 'do-not-travel' ? t('countryBrief.chips.doNotTravel')
+          : signals.travelAdvisoryMaxLevel === 'reconsider' ? t('countryBrief.chips.reconsiderTravel')
+          : t('countryBrief.chips.exerciseCaution');
+        chips.append(this.makeSignalChip(`⚠️ ${signals.travelAdvisories} ${t('countryBrief.chips.advisory')}: ${advLabel}`, 'advisory'));
+      }
+      this.addSignalChip(chips, signals.orefSirens, t('countryBrief.chips.activeSirens'), '🚨', 'conflict');
+      this.addSignalChip(chips, signals.orefHistory24h, t('countryBrief.chips.sirens24h'), '🕓', 'conflict');
+      this.addSignalChip(chips, signals.aviationDisruptions, t('countryBrief.chips.aviationDisruptions'), '🚫', 'outage');
+      this.addSignalChip(chips, signals.gpsJammingHexes, t('countryBrief.chips.gpsJammingZones'), '📡', 'outage');
     }
-    this.addSignalChip(chips, signals.climateStress, t('countryBrief.chips.climateStress'), '🌡️', 'climate');
-    this.addSignalChip(chips, signals.conflictEvents, t('countryBrief.chips.conflictEvents'), '⚔️', 'conflict');
-    this.addSignalChip(chips, signals.activeStrikes, t('countryBrief.chips.activeStrikes'), '💥', 'conflict');
-    if (signals.travelAdvisories > 0 && signals.travelAdvisoryMaxLevel) {
-      const advLabel = signals.travelAdvisoryMaxLevel === 'do-not-travel' ? t('countryBrief.chips.doNotTravel')
-        : signals.travelAdvisoryMaxLevel === 'reconsider' ? t('countryBrief.chips.reconsiderTravel')
-        : t('countryBrief.chips.exerciseCaution');
-      chips.append(this.makeSignalChip(`⚠️ ${signals.travelAdvisories} ${t('countryBrief.chips.advisory')}: ${advLabel}`, 'advisory'));
-    }
-    this.addSignalChip(chips, signals.orefSirens, t('countryBrief.chips.activeSirens'), '🚨', 'conflict');
-    this.addSignalChip(chips, signals.orefHistory24h, t('countryBrief.chips.sirens24h'), '🕓', 'conflict');
-    this.addSignalChip(chips, signals.aviationDisruptions, t('countryBrief.chips.aviationDisruptions'), '🚫', 'outage');
-    this.addSignalChip(chips, signals.gpsJammingHexes, t('countryBrief.chips.gpsJammingZones'), '📡', 'outage');
+
     this.signalsBody.append(chips);
 
-    this.signalBreakdownBody = this.el('div', 'cdp-signal-breakdown');
-    this.signalRecentBody = this.el('div', 'cdp-signal-recent');
-    this.signalsBody.append(this.signalBreakdownBody, this.signalRecentBody);
+    if (!isUap) {
+      this.signalBreakdownBody = this.el('div', 'cdp-signal-breakdown');
+      this.signalRecentBody = this.el('div', 'cdp-signal-recent');
+      this.signalsBody.append(this.signalBreakdownBody, this.signalRecentBody);
 
-    const seeded: CountryDeepDiveSignalDetails = {
-      critical: signals.criticalNews + Math.max(0, signals.activeStrikes),
-      high: signals.militaryFlights + signals.militaryVessels + signals.protests,
-      medium: signals.outages + signals.cyberThreats + signals.aisDisruptions,
-      low: signals.earthquakes + signals.temporalAnomalies + signals.satelliteFires,
-      recentHigh: [],
-    };
-    this.renderSignalBreakdown(seeded);
-    this.signalRecentBody.append(this.makeLoading('Loading top high-severity signals…'));
+      const seeded: CountryDeepDiveSignalDetails = {
+        critical: signals.criticalNews + Math.max(0, signals.activeStrikes),
+        high: signals.militaryFlights + signals.militaryVessels + signals.protests,
+        medium: signals.outages + signals.cyberThreats + signals.aisDisruptions,
+        low: signals.earthquakes + signals.temporalAnomalies + signals.satelliteFires,
+        recentHigh: [],
+      };
+      this.renderSignalBreakdown(seeded);
+      this.signalRecentBody.append(this.makeLoading('Loading top high-severity signals…'));
+    } else {
+      this.signalBreakdownBody = null;
+      this.signalRecentBody = null;
+    }
   }
 
   private addSignalChip(container: HTMLElement, count: number, label: string, icon: string, cls: string): void {
@@ -891,6 +1062,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
 
   private open(): void {
     if (this.panel.classList.contains('active')) return;
+    this.panel.dataset.ignoreNextOutsideClick = '1';
     this.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.panel.classList.add('active');
     this.panel.setAttribute('aria-hidden', 'false');

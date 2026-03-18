@@ -308,6 +308,15 @@ export const SOURCE_TIERS: Record<string, number> = {
   'GNN Health': 3,
   'GNN Heroes': 3,
   'GNN Earth': 3,
+
+  // UAP variant
+  'NASA Breaking News': 1,
+  'NASA News': 1,
+  'Space.com': 2,
+  'The Debrief': 3,
+  'NASA Technology': 1,
+  'arXiv Astrophysics': 3,
+  'arXiv Space Physics': 3,
 };
 
 export function getSourceTier(sourceName: string): number {
@@ -1171,6 +1180,39 @@ const COMMODITY_FEEDS: Record<string, Feed[]> = {
   ],
 };
 
+// UAP variant: UAP/UFO/NHI, space, disclosure, institutional, investigative, scientific, sightings
+const UAP_FEEDS: Record<string, Feed[]> = {
+  'uap-news': [
+    { name: 'UAP News (Google)', url: rss('https://news.google.com/rss/search?q=(UAP+OR+UFO+OR+"unidentified+aerial"+OR+"non-human+intelligence"+OR+disclosure)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'The Debrief', url: rss('https://thedebrief.org/feed/') },
+    { name: 'Space.com', url: rss('https://www.space.com/feeds.xml') },
+    { name: 'UAP Headlines', url: rss('https://news.google.com/rss/search?q=(UAP+OR+UFO)+disclosure+OR+Congress+OR+AARO+when:7d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  'uap-institutional': [
+    { name: 'NASA Breaking News', url: rss('https://www.nasa.gov/rss/dyn/breaking_news.rss') },
+    { name: 'NASA News', url: rss('https://news.google.com/rss/search?q=site:nasa.gov+(UAP+OR+space+OR+astronomy)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'DoD UAP', url: rss('https://news.google.com/rss/search?q=site:defense.gov+UAP+OR+UFO+when:30d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'AARO', url: rss('https://news.google.com/rss/search?q=site:aaro.mil+OR+AARO+UAP+when:30d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'FOIA UAP Release', url: rss('https://news.google.com/rss/search?q=FOIA+UFO+UAP+release+government+when:30d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  'uap-investigative': [
+    { name: 'UAP Investigative', url: rss('https://news.google.com/rss/search?q=(UAP+OR+UFO)+investigative+OR+investigation+OR+disclosure+journalism+when:14d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'The Debrief', url: rss('https://thedebrief.org/feed/') },
+    { name: 'UFO Investigation', url: rss('https://news.google.com/rss/search?q="UFO+investigation"+OR+"UAP+disclosure"+when:14d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  'uap-scientific': [
+    { name: 'Space.com', url: rss('https://www.space.com/feeds.xml') },
+    { name: 'arXiv Astrophysics', url: rss('https://export.arxiv.org/rss/astro-ph.CO') },
+    { name: 'arXiv Space Physics', url: rss('https://export.arxiv.org/rss/physics.space-ph') },
+    { name: 'Space & Astronomy', url: rss('https://news.google.com/rss/search?q=(astrophysics+OR+astronomy+OR+"space+exploration")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'NASA Technology', url: rss('https://www.nasa.gov/rss/dyn/breaking_news.rss') },
+  ],
+  'uap-sightings': [
+    { name: 'UFO Sightings', url: rss('https://news.google.com/rss/search?q=(UFO+sighting+OR+UAP+report+OR+NUFORC)+when:7d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'UAP Reports', url: rss('https://news.google.com/rss/search?q="UAP+report"+OR+"UFO+sighting"+when:7d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+};
+
 // Variant-aware exports
 export const FEEDS = SITE_VARIANT === 'tech'
   ? TECH_FEEDS
@@ -1180,7 +1222,9 @@ export const FEEDS = SITE_VARIANT === 'tech'
       ? HAPPY_FEEDS
       : SITE_VARIANT === 'commodity'
         ? COMMODITY_FEEDS
-        : FULL_FEEDS;
+        : SITE_VARIANT === 'uap'
+          ? UAP_FEEDS
+          : FULL_FEEDS;
 
 export const SOURCE_REGION_MAP: Record<string, { labelKey: string; feedKeys: string[] }> = {
   // Full (geopolitical) variant regions
@@ -1213,6 +1257,13 @@ export const SOURCE_REGION_MAP: Record<string, { labelKey: string; feedKeys: str
   dealsCorpFin: { labelKey: 'header.sourceRegionDeals', feedKeys: ['institutional', 'derivatives'] },
   finRegulation: { labelKey: 'header.sourceRegionFinRegulation', feedKeys: ['regulation'] },
   gulfMena: { labelKey: 'header.sourceRegionGulfMena', feedKeys: ['gccNews'] },
+
+  // UAP variant
+  uapNews: { labelKey: 'header.sourceRegionUapNews', feedKeys: ['uap-news'] },
+  uapInstitutional: { labelKey: 'header.sourceRegionUapInstitutional', feedKeys: ['uap-institutional'] },
+  uapInvestigative: { labelKey: 'header.sourceRegionUapInvestigative', feedKeys: ['uap-investigative'] },
+  uapScientific: { labelKey: 'header.sourceRegionUapScientific', feedKeys: ['uap-scientific'] },
+  uapSightings: { labelKey: 'header.sourceRegionUapSightings', feedKeys: ['uap-sightings'] },
 };
 
 export const INTEL_SOURCES: Feed[] = [
@@ -1282,6 +1333,13 @@ export const DEFAULT_ENABLED_SOURCES: Record<string, string[]> = {
   thinktanks: ['Foreign Policy', 'Atlantic Council', 'Foreign Affairs', 'CSIS', 'RAND', 'Brookings', 'Carnegie', 'War on the Rocks'],
   crisis: ['CrisisWatch', 'IAEA', 'WHO', 'UNHCR'],
   energy: ['Oil & Gas', 'Nuclear Energy', 'Reuters Energy', 'Mining & Resources'],
+
+  // UAP variant
+  'uap-news': ['UAP News (Google)', 'The Debrief', 'Space.com', 'UAP Headlines'],
+  'uap-institutional': ['NASA Breaking News', 'NASA News', 'DoD UAP', 'AARO', 'FOIA UAP Release'],
+  'uap-investigative': ['UAP Investigative', 'The Debrief', 'UFO Investigation'],
+  'uap-scientific': ['Space.com', 'arXiv Astrophysics', 'arXiv Space Physics', 'Space & Astronomy', 'NASA Technology'],
+  'uap-sightings': ['UFO Sightings', 'UAP Reports'],
 };
 
 export const DEFAULT_ENABLED_INTEL: string[] = [
@@ -1301,7 +1359,9 @@ export function getLocaleBoostedSources(locale: string): Set<string> {
   const lang = (locale.split('-')[0] ?? 'en').toLowerCase();
   const boosted = new Set<string>();
   if (lang === 'en') return boosted;
-  const allFeeds = [...Object.values(FULL_FEEDS).flat(), ...INTEL_SOURCES];
+  const allFeeds = SITE_VARIANT === 'uap'
+    ? [...Object.values(UAP_FEEDS).flat()]
+    : [...Object.values(FULL_FEEDS).flat(), ...INTEL_SOURCES];
   for (const f of allFeeds) {
     if (f.lang === lang) boosted.add(f.name);
     if (typeof f.url === 'object' && lang in f.url) boosted.add(f.name);
@@ -1315,25 +1375,37 @@ export function computeDefaultDisabledSources(locale?: string): string[] {
     for (const name of getLocaleBoostedSources(locale)) enabled.add(name);
   }
   const all = new Set<string>();
-  for (const feeds of Object.values(FULL_FEEDS)) for (const f of feeds) all.add(f.name);
-  for (const f of INTEL_SOURCES) all.add(f.name);
+  if (SITE_VARIANT === 'uap') {
+    for (const feeds of Object.values(UAP_FEEDS)) for (const f of feeds) all.add(f.name);
+  } else {
+    for (const feeds of Object.values(FULL_FEEDS)) for (const f of feeds) all.add(f.name);
+    for (const f of INTEL_SOURCES) all.add(f.name);
+  }
   return [...all].filter(name => !enabled.has(name));
 }
 
 export function getTotalFeedCount(): number {
   const all = new Set<string>();
-  for (const feeds of Object.values(FULL_FEEDS)) for (const f of feeds) all.add(f.name);
-  for (const f of INTEL_SOURCES) all.add(f.name);
+  if (SITE_VARIANT === 'uap') {
+    for (const feeds of Object.values(UAP_FEEDS)) for (const f of feeds) all.add(f.name);
+  } else {
+    for (const feeds of Object.values(FULL_FEEDS)) for (const f of feeds) all.add(f.name);
+    for (const f of INTEL_SOURCES) all.add(f.name);
+  }
   return all.size;
 }
 
 if (import.meta.env.DEV) {
   const allFeedNames = new Set<string>();
-  for (const feeds of Object.values(FULL_FEEDS)) for (const f of feeds) allFeedNames.add(f.name);
-  for (const f of INTEL_SOURCES) allFeedNames.add(f.name);
+  if (SITE_VARIANT === 'uap') {
+    for (const feeds of Object.values(UAP_FEEDS)) for (const f of feeds) allFeedNames.add(f.name);
+  } else {
+    for (const feeds of Object.values(FULL_FEEDS)) for (const f of feeds) allFeedNames.add(f.name);
+    for (const f of INTEL_SOURCES) allFeedNames.add(f.name);
+  }
   const defaultEnabled = getAllDefaultEnabledSources();
   for (const name of defaultEnabled) {
-    if (!allFeedNames.has(name)) console.error(`[feeds] DEFAULT_ENABLED name "${name}" not found in FULL_FEEDS!`);
+    if (!allFeedNames.has(name)) console.error(`[feeds] DEFAULT_ENABLED name "${name}" not found in FEEDS!`);
   }
   console.log(`[feeds] ${defaultEnabled.size} unique default-enabled sources / ${allFeedNames.size} total`);
 }

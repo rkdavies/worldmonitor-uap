@@ -222,7 +222,7 @@ export class Panel {
     headerLeft.appendChild(title);
 
     if (options.infoTooltip) {
-      const infoBtn = h('button', { className: 'panel-info-btn', 'aria-label': t('components.panel.showMethodologyInfo') }, '?');
+      const infoBtn = h('button', { className: 'panel-info-btn', 'aria-label': t('components.panel.showMethodologyInfo') }, 'i');
 
       const tooltip = h('div', { className: 'panel-info-tooltip' });
       tooltip.appendChild(safeHtml(options.infoTooltip));
